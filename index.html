@@ -1,0 +1,1130 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>
+<title>Biqsha Dig Run</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@500;700&family=Readex+Pro:wght@300;400;600;700&display=swap">
+<style>
+/* Layout: mobile-game shell — top resource bar, screen body, bottom tab bar with a raised Play button.
+   In a dig: HUD on top, the trench canvas in the middle, a tool hotbar at the bottom. Dusk-desert single look. */
+:root{
+  color-scheme:dark;
+  --sky-0:#120f2b; --sky-1:#221a4a; --sky-2:#4a2d63; --sky-3:#a54a4a; --sky-4:#f0a04b;
+  --panel:rgba(22,18,48,.78); --panel-2:rgba(40,32,80,.7); --edge:rgba(255,255,255,.10);
+  --ink:#fbf3e4; --muted:#b9b0cf;
+  --gold-a:#ffd66b; --gold-b:#f39a2f; --gold-sh:#a95a17;
+  --blue-a:#6aa8ff; --blue-b:#3b5fd0; --blue-sh:#24398a;
+  --red-a:#ff7a6b; --red-b:#d93a3a; --red-sh:#8a1f22;
+  --good:#7be08a; --danger:#ff5d4d;
+  --r-common:#cfc6b4; --r-rare:#5fc6ff; --r-epic:#d27cff; --r-legendary:#ffc53d;
+  --g-common:linear-gradient(135deg,#7d7568,#cfc6b4);
+  --g-rare:linear-gradient(135deg,#2f6fd6,#5fc6ff);
+  --g-epic:linear-gradient(135deg,#6a2fd6,#e070d8);
+  --g-legendary:linear-gradient(135deg,#ff8a1a,#ffd84a);
+  --f-display:"Reem Kufi","Readex Pro",system-ui,sans-serif;
+  --f-body:"Readex Pro",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+html,body{height:100%}
+body{margin:0;color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.4;overflow-x:hidden;
+  background:linear-gradient(180deg,var(--sky-0) 0%,var(--sky-1) 35%,var(--sky-2) 65%,var(--sky-3) 88%,var(--sky-4) 100%) fixed var(--sky-0);}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible,input:focus-visible{outline:3px solid var(--gold-a);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance}
+.muted{color:var(--muted);font-size:13px}
+.shell{min-height:100%;display:flex;flex-direction:column;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+.page{width:100%;max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:16px;padding-block:12px 16px}
+
+/* Game-style buttons: gradient face + hard bottom edge */
+.gbtn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 22px;border-radius:14px;
+  font-family:var(--f-display);font-weight:700;font-size:18px;letter-spacing:.02em;color:#2a1405;
+  background:linear-gradient(180deg,var(--gold-a),var(--gold-b));box-shadow:0 4px 0 var(--gold-sh),0 8px 18px rgba(0,0,0,.35);text-shadow:0 1px 0 rgba(255,255,255,.4);transition:transform .08s,box-shadow .08s}
+.gbtn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--gold-sh),0 4px 10px rgba(0,0,0,.35)}
+.gbtn.blue{color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.3);background:linear-gradient(180deg,var(--blue-a),var(--blue-b));box-shadow:0 4px 0 var(--blue-sh),0 8px 18px rgba(0,0,0,.35)}
+.gbtn.red{color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.3);background:linear-gradient(180deg,var(--red-a),var(--red-b));box-shadow:0 4px 0 var(--red-sh),0 8px 18px rgba(0,0,0,.35)}
+.gbtn.big{font-size:26px;min-height:64px;padding:12px 44px;border-radius:18px}
+.gbtn.sm{font-size:15px;min-height:40px;padding:8px 14px;border-radius:12px}
+.gbtn:disabled{filter:grayscale(.8) brightness(.7);cursor:not-allowed}
+.round{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(180deg,#4b3e86,#2b2358);box-shadow:0 3px 0 #1a1438,0 6px 12px rgba(0,0,0,.35);border:1px solid var(--edge)}
+.round svg{width:22px;height:22px}
+.panel{background:var(--panel);border:1px solid var(--edge);border-radius:20px;padding:16px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+
+/* Top resource bar */
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:flex;justify-content:space-between;align-items:center;gap:10px;padding-block:10px;max-width:960px;margin:0 auto;width:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--sky-0)}
+.player{display:flex;align-items:center;gap:10px;min-width:0}
+.avatar{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:20px;color:#2a1405;background:linear-gradient(135deg,var(--gold-a),var(--gold-b));box-shadow:0 3px 0 var(--gold-sh)}
+.pname{display:flex;flex-direction:column;min-width:0}
+.pname b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.pname span{font-size:12px;color:var(--muted)}
+.res{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.pill{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px 0 6px;border-radius:99px;background:rgba(10,8,25,.6);border:1px solid var(--edge);font-weight:600;font-variant-numeric:tabular-nums;font-size:14px}
+.pill svg{width:22px;height:22px}
+.net{font-size:11px;display:inline-flex;align-items:center;gap:5px;color:var(--muted)}
+.net i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.net.on i{background:var(--good)} .net.off i{background:var(--danger)}
+@media (max-width:560px){.pill.hide-sm,.net{display:none}}
+
+/* Bottom tab bar */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;justify-content:center;padding:8px max(12px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));
+  background:linear-gradient(180deg,rgba(18,15,43,.0),rgba(18,15,43,.92) 30%)}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);align-items:end;width:100%;max-width:560px;background:linear-gradient(180deg,#2e2660,#1b1640);border:1px solid var(--edge);border-radius:22px;padding:6px;box-shadow:0 -4px 20px rgba(0,0,0,.3)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:14px;font-size:11px;color:var(--muted)}
+.tab svg{width:26px;height:26px}
+.tab.on{color:var(--ink);background:rgba(255,255,255,.08)}
+.tab.play{margin-top:-30px}
+.tab.play .disc{width:68px;height:68px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(180deg,var(--gold-a),var(--gold-b));box-shadow:0 4px 0 var(--gold-sh),0 0 0 5px #1b1640,0 10px 24px rgba(240,160,75,.5)}
+.tab.play .disc svg{width:34px;height:34px}
+.tab.play span{color:var(--ink);font-weight:600}
+
+/* Home */
+.hero{position:relative;border-radius:24px;overflow:hidden;min-height:260px;display:flex;flex-direction:column;justify-content:flex-end;padding:20px;border:1px solid var(--edge)}
+.hero svg.scene{position:absolute;inset:0;width:100%;height:100%}
+.hero > *:not(.scene){position:relative}
+.logo span{margin-left:14px}
+.logo{font-family:var(--f-display);font-size:56px;line-height:1;color:var(--ink);text-shadow:0 3px 0 rgba(0,0,0,.35),0 0 30px rgba(255,190,90,.45)}
+.logo small{display:block;font-size:16px;letter-spacing:.3em;text-transform:uppercase;color:#ffe2b0;margin-top:6px;font-family:var(--f-body);font-weight:600}
+.nextcard{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
+.nextcard h2{font-size:24px}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.progress{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.prog{background:var(--panel);border:1px solid var(--edge);border-radius:16px;padding:12px}
+.prog b{display:block;font-family:var(--f-display);font-size:24px;font-variant-numeric:tabular-nums}
+.bar{height:8px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold-b),var(--gold-a))}
+
+/* Map */
+.mapwrap{position:relative;border-radius:24px;overflow:hidden;border:1px solid var(--edge)}
+.mapwrap svg{display:block;width:100%;height:auto}
+.site-node{cursor:pointer} .site-node.locked{cursor:not-allowed}
+.sites{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.sitecard{text-align:left;border-radius:16px;padding:12px;background:var(--panel);border:2px solid var(--edge);display:flex;flex-direction:column;gap:6px}
+.sitecard.sel{border-color:var(--gold-a)}
+.sitecard.locked{opacity:.5}
+.levels{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.lvl{width:84px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.lvl .node{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-display);font-size:28px;font-weight:700;color:#2a1405;background:linear-gradient(180deg,var(--gold-a),var(--gold-b));box-shadow:0 4px 0 var(--gold-sh),0 8px 16px rgba(0,0,0,.35)}
+.lvl .node.done{background:linear-gradient(180deg,#9ff0a8,#3fbf62);box-shadow:0 4px 0 #1f7a3a,0 8px 16px rgba(0,0,0,.35)}
+.lvl .node.locked{background:linear-gradient(180deg,#5d5680,#3a3460);color:#8f88b3;box-shadow:0 4px 0 #241f45}
+.lvl small{font-size:12px;color:var(--muted)}
+.stars{color:var(--gold-a);letter-spacing:1px;font-size:15px;text-shadow:0 1px 0 rgba(0,0,0,.4)}
+.stars .off{color:rgba(255,255,255,.18);text-shadow:none}
+
+/* Museum + ranks */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
+.card{border-radius:16px;padding:3px;background:var(--g-common)}
+.card.r-rare{background:var(--g-rare)} .card.r-epic{background:var(--g-epic)} .card.r-legendary{background:var(--g-legendary)}
+.card .in{border-radius:13px;background:linear-gradient(180deg,#2a2350,#17132f);padding:10px;height:100%;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font-size:12px}
+.card svg{width:56px;height:56px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.5))}
+.card b{font-size:13px}
+.card .rar{font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:700}
+.r-common .rar{color:var(--r-common)} .r-rare .rar{color:var(--r-rare)} .r-epic .rar{color:var(--r-epic)} .r-legendary .rar{color:var(--r-legendary)}
+.card.unknown{background:rgba(255,255,255,.12)} .card.unknown .in{opacity:.7}
+.card.flip{animation:flip .55s both}
+@keyframes flip{from{transform:rotateY(90deg) scale(.8)}to{transform:none}}
+.podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:10px;align-items:end}
+.pod{border-radius:16px 16px 6px 6px;padding:12px 8px;text-align:center;display:flex;flex-direction:column;gap:4px;align-items:center;min-width:0}
+.pod .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pod b{font-family:var(--f-display);font-size:20px;font-variant-numeric:tabular-nums}
+.pod.p1{background:var(--g-legendary);color:#2a1405;min-height:150px}
+.pod.p2{background:linear-gradient(135deg,#9aa3b5,#e3e7ef);color:#1d2230;min-height:120px}
+.pod.p3{background:linear-gradient(135deg,#a2582a,#e39a5f);color:#2a1405;min-height:100px}
+.pod .medal{font-family:var(--f-display);font-size:28px;font-weight:700}
+.lbrow{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--panel-2);font-variant-numeric:tabular-nums}
+.lbrow.me{outline:2px solid var(--gold-a)}
+.lbrow .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+input[type=text]{background:rgba(0,0,0,.35);border:1px solid var(--edge);border-radius:12px;padding:10px 12px;color:var(--ink);font:inherit;min-height:48px;width:100%}
+.setrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-block:10px;border-bottom:1px solid var(--edge)}
+.switch{width:56px;height:32px;border-radius:99px;background:#3a3460;position:relative;transition:background .2s}
+.switch::after{content:"";position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s}
+.switch.on{background:linear-gradient(90deg,#3fbf62,#9ff0a8)} .switch.on::after{transform:translateX(24px)}
+
+/* Dig screen */
+.game{height:100dvh;display:grid;grid-template-rows:auto 1fr auto;gap:8px;padding:8px max(12px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));
+  background:radial-gradient(ellipse at 50% 0%,#3a2a5c 0%,#1a1433 60%,#120f2b 100%)}
+.hud{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;max-width:1100px;width:100%;margin:0 auto}
+.timer{display:flex;align-items:center;gap:10px;background:rgba(10,8,25,.65);border:1px solid var(--edge);border-radius:99px;padding:6px 14px 6px 6px;max-width:460px;width:100%;justify-self:center}
+.timer .sunico{width:32px;height:32px;border-radius:50%;flex:none;background:radial-gradient(circle at 40% 40%,#fff4c2,#ffb347 55%,#e0643a);box-shadow:0 0 14px #ffb347}
+.timer .track{flex:1;height:14px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+.timer .track i{display:block;height:100%;width:100%;transform-origin:left;background:linear-gradient(90deg,#e0643a,#ffb347 45%,#ffe08a)}
+.timer.low .track i{background:linear-gradient(90deg,#a91d2e,#ff5d4d)}
+.timer.low .sunico{background:radial-gradient(circle at 40% 40%,#ffd0a0,#e0643a 55%,#7a1f3a);animation:pulse .6s infinite alternate}
+@keyframes pulse{to{opacity:.6}}
+.timer b{font-variant-numeric:tabular-nums;min-width:40px;text-align:right}
+.hearts{display:flex;gap:4px}
+.hearts svg{width:28px;height:28px}
+.stage{position:relative;display:grid;place-items:center;min-height:0}
+.trench{position:relative;max-width:100%;max-height:100%;aspect-ratio:8/5;width:min(100%,calc((100dvh - 210px) * 1.6));border-radius:22px;overflow:hidden;
+  box-shadow:0 0 0 3px #5a3d26,0 0 0 7px #2b1d14,0 18px 40px rgba(0,0,0,.6)}
+.trench canvas{display:block;width:100%;height:100%;touch-action:none;cursor:none}
+.objectives{position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:99px;background:rgba(10,8,25,.72);border:1px solid var(--edge);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;width:max-content}
+.chip.done{background:linear-gradient(90deg,#2a7a40,#3fbf62);border-color:transparent}
+.chip.lost{background:linear-gradient(90deg,#7a1f22,#b03030);border-color:transparent;text-decoration:line-through}
+.bag{position:absolute;bottom:10px;right:10px;display:flex;gap:6px;padding:6px;border-radius:14px;background:rgba(10,8,25,.72);border:1px solid var(--edge);min-height:52px;align-items:center}
+.bag .slot{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;padding:2px;background:var(--g-common)}
+.bag .slot.r-rare{background:var(--g-rare)} .bag .slot.r-epic{background:var(--g-epic)} .bag .slot.r-legendary{background:var(--g-legendary)}
+.bag .slot span{width:100%;height:100%;border-radius:8px;background:#1b1640;display:grid;place-items:center}
+.bag .slot svg{width:28px;height:28px}
+.bag .empty{font-size:12px;color:var(--muted);padding:0 8px}
+.toast{position:absolute;top:12px;left:50%;transform:translateX(-50%);max-width:min(92%,560px);padding:10px 16px;border-radius:14px;background:rgba(10,8,25,.85);border:1px solid var(--edge);font-size:14px;text-align:center;pointer-events:none;transition:opacity .3s}
+.toast.bad{background:linear-gradient(180deg,rgba(140,30,35,.92),rgba(90,15,25,.92))}
+.toast.good{background:linear-gradient(180deg,rgba(40,120,60,.92),rgba(20,80,40,.92))}
+.toast.gold{background:linear-gradient(180deg,rgba(200,120,20,.95),rgba(140,70,10,.95))}
+.toast.hide{opacity:0}
+.findpop{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.findpop .card{width:170px;animation:popin 1.6s both}
+@keyframes popin{0%{transform:scale(.3) rotate(-8deg);opacity:0}15%{transform:scale(1.08);opacity:1}25%{transform:scale(1)}80%{opacity:1;transform:scale(1)}100%{opacity:0;transform:translateY(-40px) scale(.8)}}
+.hotbar{display:flex;justify-content:center;align-items:flex-end;gap:14px;max-width:1100px;width:100%;margin:0 auto;position:relative}
+.tool{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
+.tool .face{width:70px;height:70px;border-radius:20px;display:grid;place-items:center;background:linear-gradient(180deg,#4b3e86,#2b2358);box-shadow:0 4px 0 #1a1438,0 8px 16px rgba(0,0,0,.4);border:2px solid transparent;transition:transform .1s}
+.tool .face svg{width:40px;height:40px}
+.tool.on{color:var(--ink)}
+.tool.on .face{background:linear-gradient(180deg,var(--gold-a),var(--gold-b));box-shadow:0 4px 0 var(--gold-sh),0 0 22px rgba(255,190,90,.55);transform:translateY(-4px)}
+.tool kbd{position:absolute;top:-6px;left:-6px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-family:var(--f-body);background:#1b1640;border:1px solid var(--edge);color:var(--muted)}
+.tool .count{position:absolute;top:-6px;right:-6px;min-width:22px;height:22px;border-radius:99px;padding:0 6px;display:grid;place-items:center;font-size:12px;background:linear-gradient(180deg,var(--red-a),var(--red-b));color:#fff}
+.tool:disabled{opacity:.45}
+.finishbtn{position:absolute;right:0;bottom:12px}
+@media (max-width:640px){.finishbtn{position:static}.hotbar{flex-wrap:wrap}.tool .face{width:60px;height:60px}}
+.storm{position:fixed;inset:0;pointer-events:none;z-index:25;opacity:0;transition:opacity .4s;background:linear-gradient(100deg,rgba(230,190,120,.25),rgba(200,140,70,.35))}
+.storm.on{opacity:1}
+.flash{position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle,rgba(255,200,70,.6),transparent 65%);opacity:0;z-index:35}
+.flash.go{animation:flash 1s}
+@keyframes flash{20%{opacity:1}100%{opacity:0}}
+
+/* Modals */
+.ov{position:fixed;inset:0;background:rgba(6,4,18,.72);display:grid;place-items:center;z-index:50;padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px));animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.modal{position:relative;width:min(520px,100%);max-height:90dvh;overflow:auto;border-radius:24px;padding:3px;background:linear-gradient(180deg,var(--gold-a),var(--gold-b) 40%,#7a3b16);animation:rise .3s cubic-bezier(.2,1.4,.4,1)}
+@keyframes rise{from{transform:translateY(30px) scale(.92)}}
+.modal .in{border-radius:21px;background:linear-gradient(180deg,#2e2660,#17132f);padding:18px;display:flex;flex-direction:column;gap:14px}
+.ribbon{margin:-18px -18px 0;padding:16px 18px 14px;border-radius:21px 21px 0 0;text-align:center;background:linear-gradient(180deg,#4a3a8c,#2e2660)}
+.ribbon h2{font-size:28px;text-shadow:0 2px 0 rgba(0,0,0,.4)}
+.ribbon.win{background:linear-gradient(180deg,#3fbf62,#1f7a3a)}
+.ribbon.lose{background:linear-gradient(180deg,#d93a3a,#7a1f22)}
+.close{position:absolute;top:12px;right:12px;z-index:2}
+.bigstars{display:flex;justify-content:center;align-items:flex-end;gap:10px;margin-top:4px}
+.bigstars span{display:block;width:58px;height:58px}
+.bigstars span:nth-child(2){width:74px;height:74px;margin-bottom:14px}
+.bigstars svg{width:100%;height:100%;filter:drop-shadow(0 3px 0 rgba(0,0,0,.4))}
+.bigstars .on{animation:starpop .5s both}
+.bigstars .on:nth-child(2){animation-delay:.25s}.bigstars .on:nth-child(3){animation-delay:.5s}
+@keyframes starpop{from{transform:scale(0) rotate(-90deg)}70%{transform:scale(1.25)}to{transform:none}}
+.goals{display:flex;flex-direction:column;gap:8px}
+.goal{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.06);font-size:14px}
+.goal svg{width:22px;height:22px;flex:none}
+.infochips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.score{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums;padding-block:6px;border-bottom:1px dashed var(--edge)}
+.score.total{font-family:var(--f-display);font-size:22px;border:0;color:var(--gold-a)}
+.btnrow{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.tutcards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:480px){.tutcards{grid-template-columns:1fr}}
+.tutcards div{background:rgba(255,255,255,.06);border-radius:14px;padding:12px;text-align:center;font-size:13px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:4px}
+.tutcards svg{width:40px;height:40px}
+.tutcards b{color:var(--ink);font-size:15px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="app"></div>
+<div class="flash" id="flash"></div>
+<div class="storm" id="storm"></div>
+
+<script>
+(() => {
+/* ---------- Content ---------- */
+const RAR = {common:{label:"Common",value:100},rare:{label:"Rare",value:250},epic:{label:"Epic",value:600},legendary:{label:"Legendary",value:1500}};
+const SITES = [
+  {id:"hili",name:"Hili",area:"Al Ain",era:"Bronze Age",x:318,y:196,depth:.95,weights:[70,24,6,0],soil:["#e9c88f","#d6a868","#b98552","#93623b","#6e4a2c"]},
+  {id:"mleiha",name:"Mleiha",area:"Sharjah",era:"Iron Age to c. 300 CE",x:322,y:118,depth:1.05,weights:[60,27,11,2],soil:["#efc58a","#e0a35c","#c47f45","#9c5e34","#6f4026"]},
+  {id:"saruq",name:"Saruq Al-Hadid",area:"Dubai desert",era:"Iron Age",x:262,y:146,depth:1.15,weights:[50,30,15,5],soil:["#f1cf96","#e4b277","#c98f58","#8d5a3a","#4f3528"]},
+  {id:"eddur",name:"Ed-Dur",area:"Umm Al Quwain",era:"1st c. CE",x:290,y:86,depth:1.2,weights:[45,30,18,7],soil:["#e8d2a8","#d4b483","#b09062","#7f6a4c","#4e4436"]},
+  {id:"julfar",name:"Julfar",area:"Ras Al Khaimah",era:"Islamic era port",x:322,y:48,depth:1.3,weights:[40,30,20,10],soil:["#e6cf9f","#cfa774","#ad7d50","#7e5638","#523525"]}
+];
+const PIECES = [
+  {id:"hili-jar",site:"hili",r:"common",name:"Painted pottery jar",g:"jar",fact:"Painted jars like this were buried in Hili's round communal tombs."},
+  {id:"hili-bead",site:"hili",r:"common",name:"Carnelian bead",g:"bead",fact:"Red carnelian beads reached the region through Bronze Age trade."},
+  {id:"hili-bowl",site:"hili",r:"rare",name:"Soft-stone bowl",g:"bowl",fact:"Carved chlorite bowls were decorated with dot-in-circle patterns."},
+  {id:"hili-axe",site:"hili",r:"epic",name:"Copper axe head",g:"blade",fact:"Copper from the Hajar mountains made this area famous in Magan times."},
+  {id:"hili-pendant",site:"hili",r:"legendary",name:"Gold twin-animal pendant",g:"pendant",fact:"Gold pendants of two animals side by side are among Al Ain's best-known finds."},
+  {id:"ml-lamp",site:"mleiha",r:"common",name:"Clay oil lamp",g:"lamp",fact:"Small lamps lit homes and graves at Mleiha."},
+  {id:"ml-shard",site:"mleiha",r:"common",name:"Glazed shard",g:"shard",m:"#4f8f86",fact:"Glazed pottery shows Mleiha's links with Mesopotamia."},
+  {id:"ml-coin",site:"mleiha",r:"rare",name:"Silver coin",g:"coin",m:"#cfd3da",fact:"Coins were minted locally at Mleiha."},
+  {id:"ml-horse",site:"mleiha",r:"epic",name:"Bronze horse bit",g:"ring",m:"#a0703a",fact:"Horses and camels were buried with honour at Mleiha."},
+  {id:"ml-mould",site:"mleiha",r:"legendary",name:"Coin mould",g:"coin",m:"#9a6a48",fact:"Clay moulds prove coins were struck right here."},
+  {id:"sa-slag",site:"saruq",r:"common",name:"Copper slag",g:"shard",m:"#4d4a48",fact:"Heaps of slag show this was a large metal-working site."},
+  {id:"sa-arrow",site:"saruq",r:"common",name:"Bronze arrowhead",g:"arrow",fact:"Hundreds of arrowheads were found in the dunes."},
+  {id:"sa-ring",site:"saruq",r:"rare",name:"Gold ring",g:"ring",fact:"Fine gold work was made alongside bronze and iron."},
+  {id:"sa-dagger",site:"saruq",r:"epic",name:"Iron dagger",g:"blade",m:"#6d6a66",fact:"Iron tools here are among the earliest in the region."},
+  {id:"sa-snake",site:"saruq",r:"legendary",name:"Bronze snake figure",g:"snake",m:"#b08040",fact:"Snake figures are the symbol of Saruq Al-Hadid."},
+  {id:"ed-glass",site:"eddur",r:"common",name:"Glass bottle shard",g:"shard",m:"#8fd3c9",fact:"Glass reached Ed-Dur from the Roman world."},
+  {id:"ed-amph",site:"eddur",r:"common",name:"Amphora",g:"jar",m:"#c07a50",fact:"Amphorae carried wine and oil across the sea."},
+  {id:"ed-bowl",site:"eddur",r:"rare",name:"Bronze bowl",g:"bowl",m:"#a0703a",fact:"Bronze vessels were placed in Ed-Dur's tombs."},
+  {id:"ed-bottle",site:"eddur",r:"epic",name:"Blown-glass flask",g:"bottle",fact:"Thin blown glass survived 2,000 years in the sand."},
+  {id:"ed-coin",site:"eddur",r:"legendary",name:"Hoard of coins",g:"coin",fact:"Ed-Dur was a busy port with coins from many lands."},
+  {id:"ju-pot",site:"julfar",r:"common",name:"Julfar ware pot",g:"jar",m:"#a8452e",fact:"Red Julfar ware was made locally and traded widely."},
+  {id:"ju-net",site:"julfar",r:"common",name:"Net sinker",g:"bead",m:"#8f8a80",fact:"Stone sinkers held fishing nets down."},
+  {id:"ju-china",site:"julfar",r:"rare",name:"Chinese porcelain shard",g:"shard",m:"#e8eef5",fact:"Blue-and-white porcelain shows trade with China."},
+  {id:"ju-celadon",site:"julfar",r:"epic",name:"Celadon bowl",g:"bowl",m:"#8fb89a",fact:"Green celadon was a prized import at Julfar."},
+  {id:"ju-pearl",site:"julfar",r:"legendary",name:"Pearl necklace",g:"necklace",fact:"Julfar was famous for its pearls."}
+];
+const MAT = {jar:"#b5653a",shard:"#a85f3a",lamp:"#b06a42",bead:"#c2452d",bowl:"#6f7d6a",blade:"#b87333",arrow:"#a8742f",pendant:"#e2b13c",ring:"#e2b13c",coin:"#d9b44a",snake:"#a0703a",bottle:"#7ec8c2",necklace:"#e2b13c"};
+const DIG_NAMES = ["Trench A","Trench B","Deep trench"];
+
+/* ---------- Glyphs ---------- */
+function glyphInner(g,c){
+  const s = c||"currentColor";
+  return ({
+    jar:`<path d="M14 6h12v4c5 3 8 8 8 14 0 7-6 12-14 12S6 31 6 24c0-6 3-11 8-14z" fill="${s}"/><path d="M9 21h22M10 26h20" stroke="#0004" stroke-width="1.6"/><path d="M14 6h12v3H14z" fill="#0003"/>`,
+    bead:`<circle cx="20" cy="20" r="11" fill="${s}"/><circle cx="16" cy="16" r="3" fill="#fff3"/><circle cx="20" cy="20" r="3.5" fill="#0006"/>`,
+    bowl:`<path d="M4 16h32c0 10-7 17-16 17S4 26 4 16z" fill="${s}"/><path d="M4 16h32" stroke="#0004" stroke-width="2"/><circle cx="12" cy="22" r="2" fill="#0004"/><circle cx="20" cy="25" r="2" fill="#0004"/><circle cx="28" cy="22" r="2" fill="#0004"/>`,
+    blade:`<path d="M20 3l5 20h-10z" fill="${s}"/><path d="M20 3v20" stroke="#fff3" stroke-width="1.5"/><rect x="12" y="23" width="16" height="3" rx="1" fill="${s}"/><rect x="18" y="26" width="4" height="10" rx="1" fill="${s}" opacity=".8"/>`,
+    pendant:`<path d="M20 5v6" stroke="${s}" stroke-width="2"/><path d="M8 18c3-6 9-7 12-3 3-4 9-3 12 3l-2 14H10z" fill="${s}"/><circle cx="14" cy="22" r="1.6" fill="#0006"/><circle cx="26" cy="22" r="1.6" fill="#0006"/><path d="M12 28h16" stroke="#fff4" stroke-width="1.2"/>`,
+    lamp:`<path d="M6 24c0-5 6-8 14-8s14 3 14 8-6 6-14 6S6 29 6 24z" fill="${s}"/><path d="M33 22c3-1 4-4 3-7" stroke="${s}" stroke-width="3" fill="none"/><ellipse cx="18" cy="22" rx="4" ry="1.6" fill="#0005"/>`,
+    shard:`<path d="M7 12l15-6 11 9-4 16-14 4-9-10z" fill="${s}"/><path d="M14 16l10 2M12 24l12 1" stroke="#0003" stroke-width="2"/>`,
+    coin:`<circle cx="20" cy="20" r="14" fill="${s}"/><circle cx="20" cy="20" r="10" fill="none" stroke="#0004" stroke-width="2"/><path d="M16 16h8v8h-8z" fill="#0003"/><circle cx="15" cy="13" r="3" fill="#fff3"/>`,
+    ring:`<circle cx="20" cy="23" r="11" fill="none" stroke="${s}" stroke-width="5"/><path d="M15 8h10l-5 6z" fill="${s}"/>`,
+    arrow:`<path d="M20 3l8 14h-5v18h-6V17h-5z" fill="${s}"/><path d="M20 4v13" stroke="#fff3" stroke-width="1.4"/>`,
+    snake:`<path d="M8 32c8 0 6-10 12-10s4 8 10 6 2-12-4-14-8-6-4-8" stroke="${s}" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="23" cy="6" r="3.5" fill="${s}"/>`,
+    bottle:`<path d="M17 4h6v9c5 2 8 7 8 12 0 6-5 11-11 11S9 31 9 25c0-5 3-10 8-12z" fill="${s}" opacity=".9"/><rect x="16" y="3" width="8" height="3" rx="1" fill="${s}"/><path d="M13 22c0-3 2-5 4-6" stroke="#fff6" stroke-width="1.5" fill="none"/>`,
+    necklace:`<path d="M6 8c2 14 8 22 14 22s12-8 14-22" stroke="${s}" stroke-width="1.5" fill="none"/>${[[7,12],[9,18],[12,23],[16,27],[20,29],[24,27],[28,23],[31,18],[33,12]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="2.6" fill="#f7f1e3"/>`).join("")}<circle cx="20" cy="33" r="3.6" fill="${s}"/>`,
+    viper:`<path d="M5 30c7 2 9-8 15-8s5 7 11 5 3-12-3-13-8-5-5-9" stroke="${s}" stroke-width="5.5" fill="none" stroke-linecap="round"/><path d="M5 30c7 2 9-8 15-8s5 7 11 5 3-12-3-13-8-5-5-9" stroke="#0005" stroke-width="5.5" fill="none" stroke-dasharray="2 4" stroke-linecap="round"/><path d="M21 1l5 3-5 4z" fill="${s}"/>`,
+    scorpion:`<ellipse cx="20" cy="24" rx="6" ry="8" fill="${s}"/><path d="M20 16c0-8 8-12 12-6l-3 2" stroke="${s}" stroke-width="3" fill="none"/><path d="M14 22l-7-3M14 26l-7 1M26 22l7-3M26 26l7 1M16 31l-4 5M24 31l4 5" stroke="${s}" stroke-width="2"/><path d="M14 18l-5-6M26 18l5-6" stroke="${s}" stroke-width="2.5"/>`,
+    flask:`<path d="M12 10h16v4c4 2 6 6 6 11 0 7-6 11-14 11S6 32 6 25c0-5 2-9 6-11z" fill="${s}"/><rect x="16" y="4" width="8" height="7" rx="2" fill="#5a3a22"/><path d="M8 24h24" stroke="#0004" stroke-width="2"/>`,
+    trowel:`<path d="M20 3l11 15-11 7-11-7z" fill="${s}"/><path d="M20 3v22" stroke="#0003" stroke-width="1.5"/><rect x="17.5" y="24" width="5" height="13" rx="2.5" fill="#7a4a24"/>`,
+    brush:`<rect x="16.5" y="3" width="7" height="16" rx="3" fill="#7a4a24"/><rect x="15" y="17" width="10" height="4" fill="#b8b8c0"/><path d="M12 21h16l-2 15H14z" fill="${s}"/><path d="M16 25v10M20 25v11M24 25v10" stroke="#0005" stroke-width="1.5"/>`,
+    scan:`<circle cx="18" cy="18" r="10" fill="none" stroke="${s}" stroke-width="4"/><path d="M26 26l9 9" stroke="#7a4a24" stroke-width="5" stroke-linecap="round"/><path d="M13 18a5 5 0 0 1 5-5" stroke="#fff" stroke-width="2" fill="none" opacity=".7"/>`,
+    star:`<path d="M20 3l5.2 10.6 11.7 1.7-8.5 8.2 2 11.6L20 29.6 9.6 35.1l2-11.6L3.1 15.3l11.7-1.7z" fill="${s}" stroke="#0004" stroke-width="1.5"/>`,
+    heart:`<path d="M20 35S5 26 5 15a8 8 0 0 1 15-4 8 8 0 0 1 15 4c0 11-15 20-15 20z" fill="${s}" stroke="#0004" stroke-width="1.5"/>`,
+    gem:`<path d="M10 6h20l7 9-17 21L3 15z" fill="${s}"/><path d="M3 15h34M14 6l-4 9 10 21 10-21-4-9" stroke="#fff5" stroke-width="1.2" fill="none"/>`,
+    coinico:`<circle cx="20" cy="20" r="15" fill="${s}"/><circle cx="20" cy="20" r="11" fill="none" stroke="#a8651a" stroke-width="2"/><text x="20" y="26" font-size="15" text-anchor="middle" font-weight="700" fill="#a8651a">ب</text>`,
+    map:`<path d="M5 9l9-3 12 4 9-3v24l-9 3-12-4-9 3z" fill="${s}" opacity=".9"/><path d="M14 6v24M26 10v24" stroke="#0005" stroke-width="2"/>`,
+    museum:`<path d="M4 15L20 5l16 10z" fill="${s}"/><path d="M8 17h4v13H8zM18 17h4v13h-4zM28 17h4v13h-4z" fill="${s}"/><rect x="5" y="31" width="30" height="4" fill="${s}"/>`,
+    trophy:`<path d="M12 5h16v9a8 8 0 0 1-16 0z" fill="${s}"/><path d="M12 8H6c0 6 3 8 6 8M28 8h6c0 6-3 8-6 8" stroke="${s}" stroke-width="2.5" fill="none"/><rect x="17" y="21" width="6" height="8" fill="${s}"/><rect x="11" y="29" width="18" height="5" rx="1" fill="${s}"/>`,
+    gear:`<path d="M20 4l3 4 5-1 1 5 4 3-2 4 2 4-4 3-1 5-5-1-3 4-3-4-5 1-1-5-4-3 2-4-2-4 4-3 1-5 5 1z" fill="${s}"/><circle cx="20" cy="20" r="5" fill="#1b1640"/>`,
+    play:`<path d="M13 8l20 12-20 12z" fill="${s}"/>`,
+    pause:`<rect x="11" y="9" width="6" height="22" rx="2" fill="${s}"/><rect x="23" y="9" width="6" height="22" rx="2" fill="${s}"/>`,
+    x:`<path d="M10 10l20 20M30 10L10 30" stroke="${s}" stroke-width="5" stroke-linecap="round"/>`,
+    clock:`<circle cx="20" cy="20" r="14" fill="none" stroke="${s}" stroke-width="3"/><path d="M20 11v10l6 4" stroke="${s}" stroke-width="3" stroke-linecap="round" fill="none"/>`,
+    sound:`<path d="M6 15h7l9-7v24l-9-7H6z" fill="${s}"/><path d="M27 13c3 4 3 10 0 14M31 9c5 6 5 16 0 22" stroke="${s}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`
+  })[g] || "";
+}
+const glyph = (g,c) => `<svg viewBox="0 0 40 40" aria-hidden="true">${glyphInner(g,c)}</svg>`;
+const rc = r => `var(--r-${r})`;
+const pieceColor = p => p.m || MAT[p.g] || "#b5653a";
+
+/* ---------- Storage (offline first) ---------- */
+const KEY = "biqsha-progress-v1";
+const blank = () => ({done:{}, museum:{}, nick:"", muted:false, runs:[], tut:false});
+let P = blank();
+try { const raw = localStorage.getItem(KEY); if (raw) P = Object.assign(blank(), JSON.parse(raw)); } catch {}
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(P)); } catch {} }
+if (!P.nick) { P.nick = "Digger " + Math.floor(1000 + Math.random()*9000); save(); }
+const lvKey = i => "L" + i;
+const levelsWon = () => { let n = 0; while (n < 15 && P.done[lvKey(n)]) n++; return n; };
+const unlockedUpTo = () => Math.min(14, levelsWon());
+const totalScore = () => Object.values(P.done).reduce((a,d)=>a+d.score,0);
+const totalStars = () => Object.values(P.done).reduce((a,d)=>a+d.stars,0);
+const legendCount = () => PIECES.filter(p=>p.r==="legendary" && P.museum[p.id]).length;
+const museumCount = () => PIECES.filter(p=>P.museum[p.id]).length;
+const sitesOpen = () => Math.min(5, Math.floor(levelsWon()/3) + 1);
+
+/* ---------- Online leaderboard ---------- */
+let db = null, me = null, board = [], online = false;
+async function connect(){
+  try {
+    if (!window.claude?.use) return;
+    const [d,u] = await Promise.all([claude.use("db"), claude.use("user")]);
+    if (!d || !u) return;
+    db = d; me = await u.id(); online = true;
+    db.collection("scores").orderBy("total","desc").limit(25).onSnapshot(s => {
+      board = s.docs.map(x => ({id:x.id, ...x.data()}));
+      if (view === "ranks") render();
+    }, () => { online = false; });
+    if (view !== "dig") render();
+    pushScore();
+  } catch { online = false; }
+}
+let lastPushed = -1;
+async function pushScore(){
+  if (!db || !me) return;
+  const t = totalScore();
+  if (t === lastPushed) return;
+  try { await db.doc("scores/" + me).set({nick:P.nick.slice(0,20), total:t, stars:totalStars(), legendary:legendCount(), finds:museumCount(), updatedAt:Date.now()}); lastPushed = t; } catch {}
+}
+addEventListener("online", () => view!=="dig" && render());
+addEventListener("offline", () => view!=="dig" && render());
+
+/* ---------- Sound ---------- */
+let ac = null;
+function tone(freq, dur=.08, type="square", vol=.05, when=0){
+  if (P.muted) return;
+  try {
+    ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+    const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + when;
+    o.type = type; o.frequency.value = freq; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t+dur);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+dur+.02);
+  } catch {}
+}
+const sfx = {
+  dig(){ tone(120,.07,"triangle",.07); tone(70,.09,"sine",.05,.02) },
+  brush(){ tone(1800+Math.random()*600,.03,"sawtooth",.006) },
+  crack(){ tone(90,.18,"sawtooth",.08); tone(60,.2,"square",.04,.05) },
+  find(r){ ({common:[523],rare:[523,659],epic:[523,659,784],legendary:[523,659,784,1047]})[r].forEach((f,i)=>tone(f,.2,"triangle",.07,i*.1)) },
+  bite(){ tone(200,.25,"sawtooth",.08); tone(120,.3,"sawtooth",.06,.1) },
+  hiss(){ tone(2600,.35,"sawtooth",.012) },
+  tick(){ tone(880,.03,"square",.02) },
+  scan(){ [300,600,900].forEach((f,i)=>tone(f,.12,"sine",.04,i*.06)) },
+  water(){ tone(700,.1,"sine",.05); tone(900,.1,"sine",.05,.08) },
+  win(){ [523,659,784,1047,1319].forEach((f,i)=>tone(f,.2,"triangle",.06,i*.12)) },
+  lose(){ [392,330,262].forEach((f,i)=>tone(f,.25,"triangle",.06,i*.18)) },
+  tap(){ tone(660,.04,"triangle",.04) }
+};
+
+/* ---------- Noise ---------- */
+function makeNoise(seed){
+  const perm = new Uint8Array(512); const p = [...Array(256).keys()];
+  let s = seed; const rnd = () => (s = (s*16807) % 2147483647) / 2147483647;
+  for (let i=255;i>0;i--){ const j = Math.floor(rnd()*(i+1)); [p[i],p[j]] = [p[j],p[i]]; }
+  for (let i=0;i<512;i++) perm[i] = p[i&255];
+  const val = (x,y) => perm[(perm[x&255] + y) & 511] / 255;
+  const sm = t => t*t*(3-2*t);
+  const n2 = (x,y) => { const xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi;
+    const a=val(xi,yi), b=val(xi+1,yi), c=val(xi,yi+1), d=val(xi+1,yi+1), u=sm(xf), v=sm(yf);
+    return a+(b-a)*u + (c-a)*v + (a-b-c+d)*u*v; };
+  return (x,y,oct=3) => { let sum=0, amp=1, f=1, norm=0; for (let o=0;o<oct;o++){ sum+=n2(x*f,y*f)*amp; norm+=amp; amp*=.5; f*=2; } return sum/norm; };
+}
+
+/* ---------- Level config ---------- */
+function levelCfg(i){
+  const s = Math.floor(i/3), l = i%3, site = SITES[s];
+  return {i, s, l, site,
+    time: 90 - l*8 - s*3,
+    pieces: 3 + (s>=2?1:0) + (l===2?1:0),
+    snakes: 1 + Math.floor((s*3+l)/4),
+    scorpions: s>=1 ? Math.min(3, s + (l===2?1:0)) : 0,
+    water: 1 + (s>=3?1:0),
+    scans: s>=4 ? 2 : 3,
+    storm: s>=3};
+}
+const need = cfg => cfg.pieces - 1;
+function rollPiece(site, weights){
+  let n = Math.random()*100, idx = 0;
+  for (; idx<4; idx++){ n -= weights[idx]; if (n < 0) break; }
+  const r = ["common","rare","epic","legendary"][Math.min(idx,3)];
+  const pool = PIECES.filter(p=>p.site===site.id && p.r===r);
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+/* ---------- Trench simulation ---------- */
+const WW = 960, WH = 600, G = 4, GW = WW/G, GH = WH/G;
+const TROWEL = {r:38, amt:.34}, BRUSH = {r:30, rate:.95}, SCAN_R = 170, HINT_T = .3, CLEAR_T = .035;
+const imgCache = {};
+function glyphImg(g,color){
+  const k = g+"|"+color;
+  if (!imgCache[k]){
+    const im = new Image();
+    im.src = "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="160" height="160">${glyphInner(g,color)}</svg>`);
+    imgCache[k] = im;
+  }
+  return imgCache[k];
+}
+const ready = im => im.complete && im.naturalWidth ? Promise.resolve() : (im.decode ? im.decode().catch(()=>{}) : new Promise(r=>{im.onload=r;im.onerror=r;}));
+
+function itemGlyph(it){
+  if (it.t==="piece") return glyphImg(it.piece.g, pieceColor(it.piece));
+  if (it.t==="snake") return glyphImg("viper","#8a6a3a");
+  if (it.t==="scorpion") return glyphImg("scorpion","#3d2a1a");
+  return glyphImg("flask","#3f8fa0");
+}
+async function buildLevel(cfg){
+  const noise = makeNoise(1 + Math.floor(Math.random()*1e6));
+  const T = new Float32Array(GW*GH), T0 = new Float32Array(GW*GH), bed = new Float32Array(GW*GH), grain = new Float32Array(GW*GH);
+  const D = cfg.site.depth;
+  for (let y=0;y<GH;y++) for (let x=0;x<GW;x++){
+    const i = y*GW+x, wx = x*G, wy = y*G;
+    const mound = noise(wx*.0045, wy*.0045, 3), detail = noise(wx*.025+90, wy*.025+30, 2);
+    T0[i] = T[i] = D*(.55 + .45*mound + .12*detail);
+    bed[i] = .35*noise(wx*.006+200, wy*.006+200, 2);
+    grain[i] = (Math.random()-.5)*.08 + (noise(wx*.08+400, wy*.08, 1)-.5)*.12;
+  }
+  // Place items with spacing
+  const items = [], spots = [];
+  const place = (size) => {
+    for (let t=0;t<400;t++){
+      const x = 70 + Math.random()*(WW-140), y = 70 + Math.random()*(WH-140);
+      if (spots.every(s => Math.hypot(s.x-x, s.y-y) > (s.size+size)/2 + 26)){ spots.push({x,y,size}); return {x,y}; }
+    }
+    return {x:70+Math.random()*(WW-140), y:70+Math.random()*(WH-140)};
+  };
+  const used = new Set();
+  for (let p=0;p<cfg.pieces;p++){
+    let piece = rollPiece(cfg.site, cfg.site.weights);
+    if (p===0 && cfg.l===2 && piece.r==="common") piece = rollPiece(cfg.site,[0,60,30,10]);
+    for (let t=0; t<6 && used.has(piece.id); t++) piece = rollPiece(cfg.site, cfg.site.weights);
+    used.add(piece.id);
+    const size = 92 + Math.random()*22;
+    items.push({t:"piece", piece, size, ...place(size), rot:(Math.random()-.5)*1.4, hp:100, cracks:[]});
+  }
+  for (let p=0;p<cfg.snakes;p++){ const size = 104; items.push({t:"snake", size, ...place(size), rot:Math.random()*6.28}); }
+  for (let p=0;p<cfg.scorpions;p++){ const size = 76; items.push({t:"scorpion", size, ...place(size), rot:Math.random()*6.28}); }
+  for (let p=0;p<cfg.water;p++){ const size = 64; items.push({t:"water", size, ...place(size), rot:(Math.random()-.5)*1.2}); }
+  await Promise.all(items.map(it => ready(itemGlyph(it))));
+  const lv = {T, T0, bed, grain, items, mask:new Int16Array(GW*GH), floor:makeFloor(cfg)};
+  rebuildMasks(lv);
+  return lv;
+}
+function rebuildMasks(lv){
+  lv.mask.fill(0);
+  const c = document.createElement("canvas"); c.width = GW; c.height = GH;
+  const x = c.getContext("2d", {willReadFrequently:true});
+  lv.items.forEach((it,n) => {
+    it.px = [];
+    if (it.gone) return;
+    x.clearRect(0,0,GW,GH);
+    x.save(); x.translate(it.x/G, it.y/G); x.rotate(it.rot); const s = it.size/G; x.drawImage(itemGlyph(it), -s/2, -s/2, s, s); x.restore();
+    const d = x.getImageData(0,0,GW,GH).data;
+    for (let i=0;i<GW*GH;i++) if (d[i*4+3] > 90 && !lv.mask[i]){ lv.mask[i] = n+1; it.px.push(i); }
+  });
+}
+function makeFloor(cfg){
+  const c = document.createElement("canvas"); c.width = WW; c.height = WH;
+  const x = c.getContext("2d");
+  const deep = cfg.site.soil[4];
+  const g = x.createRadialGradient(WW/2, WH/2, 60, WW/2, WH/2, WW*.7);
+  g.addColorStop(0, shade(deep, 1.05)); g.addColorStop(1, shade(deep, .55));
+  x.fillStyle = g; x.fillRect(0,0,WW,WH);
+  for (let k=0;k<900;k++){ x.fillStyle = `rgba(${Math.random()<.5?"0,0,0":"255,230,200"},${Math.random()*.12})`; const r = Math.random()*3+.5; x.beginPath(); x.arc(Math.random()*WW, Math.random()*WH, r, 0, 6.28); x.fill(); }
+  return c;
+}
+function hex(c){ const n = parseInt(c.slice(1),16); return [n>>16, (n>>8)&255, n&255]; }
+function shade(c,f){ const [r,g,b] = hex(c); return `rgb(${Math.min(255,r*f)|0},${Math.min(255,g*f)|0},${Math.min(255,b*f)|0})`; }
+
+/* ---------- Game state ---------- */
+let view = "home", selSite = 0, G_ = null, raf = 0, modal = null, popup = null;
+const app = document.getElementById("app");
+let cv, cx, soilC, soilX, soilImg, strata;
+
+async function startLevel(i){
+  modal = null; popup = null;
+  const cfg = levelCfg(i);
+  view = "dig"; renderDigShell(cfg);
+  const lv = await buildLevel(cfg);
+  G_ = {cfg, lv, tool:"trowel", time:cfg.time, hearts:3, scans:cfg.scans, found:[], over:false, paused:false,
+        last:performance.now(), stormDone:!cfg.storm, lowWarned:false, tick:0,
+        ptr:{x:-99,y:-99,down:false,in:false,lastScoop:null}, particles:[], actors:[], pulses:[], trails:[], dirty:true, msgT:0};
+  strata = buildStrata(cfg.site.soil);
+  paintHud(); paintTools(); paintBag();
+  if (!P.tut){ G_.paused = true; modal = {type:"tutorial"}; renderModal(); }
+  else toast(i===0 ? "Scan first, then dig. Brush the last layer when you see an outline." : `Find ${need(cfg)} pieces before sunset.`);
+  cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
+}
+function buildStrata(cols){
+  // Colour by depth dug: 5 bands with soft blends and a thin dark seam between bands
+  const N = 256, out = new Uint8ClampedArray(N*3), stops = cols.map(hex);
+  for (let k=0;k<N;k++){
+    const d = k/N*1.6, band = Math.min(3.999, d/0.4), b = Math.floor(band), f = band-b;
+    const a = stops[b], c = stops[b+1], t = f<.75 ? f*.25 : .19 + (f-.75)*3.2;
+    const seam = d > .08 && (f>.93 || f<.03) ? .84 : 1;
+    for (let j=0;j<3;j++) out[k*3+j] = (a[j] + (c[j]-a[j])*Math.min(1,t)) * seam;
+  }
+  return out;
+}
+
+/* ---------- Tools ---------- */
+function toWorld(e){ const r = cv.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width*WW, y:(e.clientY-r.top)/r.height*WH}; }
+function forDisk(x,y,r,fn){
+  const gx0 = Math.max(0, Math.floor((x-r)/G)), gx1 = Math.min(GW-1, Math.ceil((x+r)/G));
+  const gy0 = Math.max(0, Math.floor((y-r)/G)), gy1 = Math.min(GH-1, Math.ceil((y+r)/G));
+  for (let gy=gy0; gy<=gy1; gy++) for (let gx=gx0; gx<=gx1; gx++){
+    const d = Math.hypot(gx*G+G/2-x, gy*G+G/2-y); if (d > r) continue;
+    fn(gy*GW+gx, 1 - (d/r)*(d/r));
+  }
+}
+function scoop(x,y){
+  const lv = G_.lv, hits = new Map();
+  forDisk(x,y,TROWEL.r,(i,f) => {
+    const amt = TROWEL.amt*(.35+.65*f), t = lv.T[i], m = lv.mask[i];
+    if (m && t < amt && t < .5){ const it = lv.items[m-1]; if (!it.got && !it.gone) hits.set(it, (hits.get(it)||0) + 1); }
+    lv.T[i] = Math.max(0, t - amt);
+  });
+  sfx.dig(); dust(x,y,14, G_.cfg.site.soil[1]);
+  G_.dirty = true;
+  for (const [it,n] of hits){
+    if (n < 4) continue;
+    if (it.t === "piece"){
+      const dmg = Math.min(40, 10 + n*.5);
+      it.hp = Math.max(15, Math.round(it.hp - dmg)); sfx.crack(); shakeStage();
+      it.cracks.push({a:Math.random()*6.28, l:.3+Math.random()*.25});
+      toast(`Crack! The trowel hit the ${it.piece.name.toLowerCase()} (${it.hp}% intact). Use the brush when you see an outline.`, "bad");
+    } else if (it.t === "snake" || it.t === "scorpion"){
+      G_.hearts--; G_.time = Math.max(0, G_.time - 5); sfx.bite(); shakeStage(); paintHud();
+      toast(`${it.t==="snake"?"A snake bit you":"A scorpion stung you"}! −1 life, −5 s. Brush over red marks to stay safe.`, "bad");
+      flee(it, false);
+      if (G_.hearts <= 0) setTimeout(()=>endLevel("hearts"), 600);
+    }
+  }
+  checkItems();
+}
+function brushAt(x,y,dt){
+  const lv = G_.lv;
+  forDisk(x,y,BRUSH.r,(i,f) => { lv.T[i] = Math.max(0, lv.T[i] - BRUSH.rate*dt*(.25+.75*f)); });
+  if (Math.random() < .35) dust(x,y,2, G_.cfg.site.soil[0], .6);
+  if (Math.random() < .2) sfx.brush();
+  G_.dirty = true;
+}
+function scanAt(x,y){
+  if (G_.scans <= 0){ toast("No scans left on this dig.", "bad"); return; }
+  G_.scans--; sfx.scan(); paintTools();
+  G_.pulses.push({x,y,t:0});
+  let p = 0, d = 0;
+  G_.lv.items.forEach(it => { if (!it.got && !it.gone && Math.hypot(it.x-x, it.y-y) < SCAN_R){ it.scanned = true; it.jx = (Math.random()-.5)*16; it.jy = (Math.random()-.5)*16; if (it.t==="piece") p++; else if (it.t!=="water") d++; } });
+  toast(p||d ? `Scan: ${p} piece${p===1?"":"s"} (gold rings) and ${d} danger${d===1?"":"s"} (red rings) here.` : "Scan: nothing here. Dig fast with the trowel.", d ? "bad" : p ? "gold" : "");
+  if (G_.scans === 0){ G_.tool = "trowel"; paintTools(); }
+}
+function uncovered(it){
+  if (!it.px.length) return 0;
+  let n = 0; for (const i of it.px) if (G_.lv.T[i] < CLEAR_T) n++;
+  return n / it.px.length;
+}
+function checkItems(){
+  for (const it of G_.lv.items){
+    if (it.got || it.gone) continue;
+    const u = uncovered(it);
+    if (it.t === "piece" && u > .8) collect(it);
+    else if (it.t === "water" && u > .5){ it.got = true; G_.time += 8; sfx.water(); toast("Water flask! +8 seconds of daylight.", "good"); clearUnder(it); }
+    else if ((it.t === "snake" || it.t === "scorpion") && u > .3){
+      sfx.hiss(); toast(it.t==="snake" ? "A snake! It slid away under the sand. Follow the tracks and keep clear." : "A scorpion! It scuttled off the site.", "bad");
+      flee(it, it.t === "snake");
+    }
+  }
+}
+function clearUnder(it){ for (const i of it.px) G_.lv.T[i] = 0; G_.dirty = true; }
+function collect(it){
+  it.got = true; clearUnder(it);
+  G_.found.push({piece:it.piece, hp:it.hp});
+  sfx.find(it.piece.r);
+  if (it.piece.r === "legendary" || it.piece.r === "epic") burst();
+  sparkle(it.x, it.y, it.piece.r);
+  showFind(it.piece, it.hp);
+  const left = need(G_.cfg) - G_.found.length;
+  toast(`${RAR[it.piece.r].label}: ${it.piece.name}, ${it.hp}% intact. ${left>0 ? `${left} more to go.` : "Enough for the museum! Finish now or keep digging."}`, it.hp<75 ? "bad" : it.piece.r==="legendary" ? "gold" : "good");
+  paintBag(); paintHud();
+  if (G_.found.length === G_.cfg.pieces) setTimeout(()=>endLevel("all"), 1400);
+}
+function flee(it, relocate){
+  const from = {x:it.x, y:it.y};
+  let to;
+  if (relocate){
+    const lv = G_.lv;
+    for (let t=0;t<200;t++){
+      const x = 70+Math.random()*(WW-140), y = 70+Math.random()*(WH-140);
+      if (Math.hypot(x-from.x,y-from.y) < 160 || Math.hypot(x-from.x,y-from.y) > 380) continue;
+      if (lv.items.some(o => o!==it && !o.got && !o.gone && Math.hypot(o.x-x,o.y-y) < (o.size+it.size)/2+10)) continue;
+      const i = Math.floor(y/G)*GW + Math.floor(x/G); if (lv.T[i] < .35) continue;
+      to = {x,y}; break;
+    }
+  }
+  const dest = to || {x: from.x < WW/2 ? -120 : WW+120, y: from.y + (Math.random()-.5)*200};
+  it.gone = true; it.scanned = false;
+  G_.actors.push({it, from, to:dest, t:0, dur:1.3, relocate:!!to});
+  rebuildMasks(G_.lv);
+}
+function dust(x,y,n,col,spd=1){
+  for (let k=0;k<n;k++) G_.particles.push({x,y,vx:(Math.random()-.5)*260*spd,vy:(Math.random()-.8)*240*spd,life:.5+Math.random()*.4,t:0,col,r:2+Math.random()*3});
+}
+function sparkle(x,y,r){
+  const col = {common:"#fff2d0",rare:"#7fd6ff",epic:"#e59bff",legendary:"#ffd84a"}[r];
+  for (let k=0;k<40;k++){ const a = Math.random()*6.28, s = 80+Math.random()*220; G_.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.8+Math.random()*.6,t:0,col,r:2+Math.random()*3,glow:true}); }
+}
+function shakeStage(){ const t = document.querySelector(".trench"); if (!t) return; t.animate([{transform:"translate(0,0)"},{transform:"translate(-6px,3px)"},{transform:"translate(5px,-3px)"},{transform:"translate(0,0)"}],{duration:280}); }
+function burst(){ const f = document.getElementById("flash"); f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); }
+function sandstorm(){
+  const st = document.getElementById("storm"); st.classList.add("on");
+  toast("Sandstorm! Sand is blowing back into the trench.", "bad");
+  G_.storm = 1.8;
+  setTimeout(() => {
+    st.classList.remove("on");
+    if (!G_ || G_.over) return;
+    const lv = G_.lv, n = makeNoise(Math.floor(Math.random()*1e5));
+    for (let i=0;i<GW*GH;i++){ const x = (i%GW)*G, y = Math.floor(i/GW)*G; lv.T[i] = Math.min(lv.T0[i], lv.T[i] + .22*n(x*.01,y*.01,2)); }
+    lv.items.forEach(it => { if (it.got) for (const i of it.px) lv.T[i] = 0; });
+    G_.dirty = true;
+  }, 1800);
+}
+
+/* ---------- Frame loop & drawing ---------- */
+function loop(now){
+  if (!G_ || view !== "dig") return;
+  const dt = Math.min(.05, (now - G_.last)/1000); G_.last = now;
+  const live = !G_.paused && !G_.over && !modal;
+  if (live){
+    G_.time -= dt;
+    if (G_.time <= 15 && Math.floor(G_.time) !== G_.tick){ G_.tick = Math.floor(G_.time); if (G_.time > 0) sfx.tick(); }
+    if (G_.time <= 15 && !G_.lowWarned){ G_.lowWarned = true; toast("The sun is setting. 15 seconds left!", "bad"); }
+    if (!G_.stormDone && G_.time <= G_.cfg.time/2){ G_.stormDone = true; sandstorm(); }
+    if (G_.ptr.down && G_.tool === "brush" && G_.ptr.in){ brushAt(G_.ptr.x, G_.ptr.y, dt); G_.brushCheck = (G_.brushCheck||0) + dt; if (G_.brushCheck > .12){ G_.brushCheck = 0; checkItems(); } }
+    if (G_.time <= 0){ G_.time = 0; endLevel("sunset"); }
+    paintTimer();
+  }
+  if (G_.msgT > 0){ G_.msgT -= dt; if (G_.msgT <= 0) document.getElementById("toast")?.classList.add("hide"); }
+  draw(dt, now/1000);
+  raf = requestAnimationFrame(loop);
+}
+function paintSoil(){
+  const lv = G_.lv, d = soilImg.data, T = lv.T, T0 = lv.T0, bed = lv.bed, M = lv.mask;
+  for (let y=0;y<GH;y++) for (let x=0;x<GW;x++){
+    const i = y*GW+x, o = i*4, t = T[i];
+    if (t < .004){ d[o+3] = 0; continue; }
+    const dug = Math.max(0, Math.max(0, T0[i] - t) + lv.grain[i]*.1);
+    const k = Math.min(255, Math.max(0, (dug/1.6*256)|0))*3;
+    // Hillshade from the surface height (bed + soil): light from the top-left
+    const xa = x>0?i-1:i, xb = x<GW-1?i+1:i, ya = y>0?i-GW:i, yb = y<GH-1?i+GW:i;
+    const sx = (bed[xb]+T[xb]) - (bed[xa]+T[xa]), sy = (bed[yb]+T[yb]) - (bed[ya]+T[ya]);
+    let sh = 1 - (sx + sy)*4.5 + lv.grain[i]*.35;
+    const m = M[i];
+    if (m && t < HINT_T){ const it = lv.items[m-1]; if (!it.got && !it.gone) sh *= 1 - (1 - t/HINT_T)*.42; }
+    sh = Math.max(.45, Math.min(1.45, sh));
+    d[o] = strata[k]*sh; d[o+1] = strata[k+1]*sh; d[o+2] = strata[k+2]*sh;
+    d[o+3] = Math.min(255, t/.09*255);
+  }
+  soilX.putImageData(soilImg, 0, 0);
+}
+function draw(dt, now){
+  const lv = G_.lv;
+  if (G_.dirty){ paintSoil(); G_.dirty = false; }
+  cx.drawImage(lv.floor, 0, 0);
+  // Buried items (and imprints of collected ones)
+  for (const it of lv.items){
+    if (it.gone) continue;
+    cx.save(); cx.translate(it.x, it.y); cx.rotate(it.rot);
+    if (it.got){ cx.globalAlpha = .22; cx.filter = "brightness(0)"; }
+    else { cx.shadowColor = "rgba(0,0,0,.55)"; cx.shadowBlur = 8; cx.shadowOffsetY = 3; }
+    const s = it.size; cx.drawImage(itemGlyph(it), -s/2, -s/2, s, s);
+    cx.filter = "none"; cx.shadowColor = "transparent";
+    if (!it.got && it.cracks?.length){
+      cx.strokeStyle = "rgba(25,12,5,.9)"; cx.lineWidth = 2.2;
+      it.cracks.forEach(c => { cx.beginPath(); let px = 0, py = 0; cx.moveTo(px,py); for (let k=0;k<4;k++){ px += Math.cos(c.a + (k%2?.5:-.4))*s*c.l/4; py += Math.sin(c.a + (k%2?.5:-.4))*s*c.l/4; cx.lineTo(px,py); } cx.stroke(); });
+    }
+    cx.restore();
+  }
+  // Soil over everything, smoothly upscaled (no visible cells)
+  cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = "high";
+  cx.filter = "blur(1.6px)"; cx.drawImage(soilC, 0, 0, WW, WH); cx.filter = "none";
+  // Snake tracks
+  for (const tr of G_.trails){
+    cx.save(); cx.strokeStyle = "rgba(60,30,15,.45)"; cx.lineWidth = 7; cx.lineCap = "round"; cx.setLineDash([2,10]);
+    cx.beginPath(); for (let k=0;k<=24;k++){ const f = k/24, x = tr.a.x + (tr.b.x-tr.a.x)*f, y = tr.a.y + (tr.b.y-tr.a.y)*f, n = Math.sin(f*18)*10; const ang = Math.atan2(tr.b.y-tr.a.y, tr.b.x-tr.a.x)+Math.PI/2; k ? cx.lineTo(x+Math.cos(ang)*n, y+Math.sin(ang)*n) : cx.moveTo(x,y); } cx.stroke(); cx.restore();
+  }
+  // Scan rings
+  for (const it of lv.items){
+    if (!it.scanned || it.got || it.gone) continue;
+    const col = it.t==="piece" ? "255,214,107" : it.t==="water" ? "110,210,230" : "255,93,77";
+    const r = it.size*.55 + Math.sin(now*4)*3;
+    cx.save(); cx.strokeStyle = `rgba(${col},.85)`; cx.lineWidth = 3; cx.setLineDash([8,7]); cx.lineDashOffset = -now*20;
+    cx.beginPath(); cx.arc(it.x+it.jx, it.y+it.jy, r, 0, 6.28); cx.stroke();
+    cx.fillStyle = `rgba(${col},.12)`; cx.fill();
+    cx.setLineDash([]); cx.fillStyle = `rgb(${col})`; cx.font = "700 20px Readex Pro, sans-serif"; cx.textAlign = "center";
+    cx.fillText(it.t==="piece" ? "✦" : it.t==="water" ? "+8s" : "!", it.x+it.jx, it.y+it.jy+7);
+    cx.restore();
+  }
+  // Scan pulses
+  G_.pulses = G_.pulses.filter(p => (p.t += dt) < .9);
+  for (const p of G_.pulses){ cx.save(); cx.strokeStyle = `rgba(140,220,255,${1-p.t/.9})`; cx.lineWidth = 4; cx.beginPath(); cx.arc(p.x,p.y, SCAN_R*(p.t/.9), 0, 6.28); cx.stroke(); cx.restore(); }
+  // Fleeing creatures
+  G_.actors = G_.actors.filter(a => {
+    a.t += dt; const f = Math.min(1, a.t/a.dur), e = f<.5 ? 2*f*f : 1-Math.pow(-2*f+2,2)/2;
+    const x = a.from.x + (a.to.x-a.from.x)*e, y = a.from.y + (a.to.y-a.from.y)*e;
+    const ang = Math.atan2(a.to.y-a.from.y, a.to.x-a.from.x);
+    cx.save(); cx.translate(x + Math.sin(a.t*30)*3, y); cx.rotate(ang + Math.PI/2); const s = a.it.size*(a.relocate ? 1-.5*f : 1);
+    cx.drawImage(a.it.t==="snake" ? glyphImg("viper","#8a6a3a") : glyphImg("scorpion","#3d2a1a"), -s/2, -s/2, s, s); cx.restore();
+    if (f >= 1){
+      if (a.relocate){ a.it.x = a.to.x; a.it.y = a.to.y; a.it.gone = false; a.it.rot = Math.random()*6.28; G_.trails.push({a:a.from, b:a.to}); rebuildMasks(G_.lv); }
+      return false;
+    }
+    return true;
+  });
+  // Particles
+  G_.particles = G_.particles.filter(p => (p.t += dt) < p.life);
+  for (const p of G_.particles){
+    p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 520*dt*(p.glow?0.3:1); p.vx *= .97;
+    cx.globalAlpha = 1 - p.t/p.life; cx.fillStyle = p.col;
+    if (p.glow){ cx.shadowColor = p.col; cx.shadowBlur = 10; }
+    cx.beginPath(); cx.arc(p.x,p.y,p.r,0,6.28); cx.fill(); cx.shadowBlur = 0;
+  }
+  cx.globalAlpha = 1;
+  // Trench vignette
+  const v = cx.createRadialGradient(WW/2, WH/2, WH*.35, WW/2, WH/2, WW*.62);
+  v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(20,8,0,.55)");
+  cx.fillStyle = v; cx.fillRect(0,0,WW,WH);
+  // Sand haze during storm
+  if (G_.storm > 0){ G_.storm -= dt; cx.fillStyle = "rgba(220,180,120,.35)"; for (let k=0;k<60;k++){ const y = Math.random()*WH, x = Math.random()*WW; cx.fillRect(x, y, 40+Math.random()*80, 2); } }
+  // Tool cursor
+  const pt = G_.ptr;
+  if (pt.in && !G_.over){
+    const r = G_.tool==="trowel" ? TROWEL.r : G_.tool==="brush" ? BRUSH.r : 26;
+    cx.save(); cx.strokeStyle = G_.tool==="scan" ? "rgba(140,220,255,.9)" : "rgba(255,255,255,.75)"; cx.lineWidth = 2; cx.setLineDash(G_.tool==="brush"?[4,4]:[]);
+    cx.beginPath(); cx.arc(pt.x, pt.y, r, 0, 6.28); cx.stroke(); cx.setLineDash([]);
+    const ti = glyphImg(G_.tool, G_.tool==="trowel" ? "#c9ccd4" : G_.tool==="brush" ? "#e8c27a" : "#8cdcff");
+    cx.translate(pt.x + 16, pt.y - 44); cx.rotate(pt.down ? -.5 : -.2); cx.drawImage(ti, -22, -22, 50, 50);
+    cx.restore();
+  }
+}
+
+/* ---------- Input ---------- */
+function bindCanvas(){
+  const pt = () => G_?.ptr;
+  cv.addEventListener("pointerdown", e => {
+    if (!G_ || G_.over || G_.paused || modal) return;
+    cv.setPointerCapture(e.pointerId);
+    const p = toWorld(e); Object.assign(pt(), p, {down:true, in:true});
+    if (G_.tool === "trowel"){ scoop(p.x,p.y); pt().lastScoop = p; }
+    else if (G_.tool === "scan") scanAt(p.x,p.y);
+  });
+  cv.addEventListener("pointermove", e => {
+    if (!G_) return;
+    const p = toWorld(e); Object.assign(pt(), p, {in:true});
+    if (pt().down && G_.tool === "trowel" && !G_.over && !G_.paused && !modal){
+      const l = pt().lastScoop; if (l && Math.hypot(p.x-l.x, p.y-l.y) > 34){ scoop(p.x,p.y); pt().lastScoop = p; }
+    }
+  });
+  const up = () => { if (G_){ pt().down = false; pt().lastScoop = null; if (G_.tool==="brush") checkItems(); } };
+  cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+  cv.addEventListener("pointerleave", () => { if (G_){ pt().in = false; up(); } });
+}
+
+/* ---------- End of dig ---------- */
+function starsFor(g, won){ return [won, won && g.found.every(f=>f.hp>=75), won && g.found.length===g.cfg.pieces]; }
+function endLevel(reason){
+  if (!G_ || G_.over) return;
+  G_.over = true;
+  const won = G_.found.length >= need(G_.cfg) && G_.hearts > 0;
+  const st = starsFor(G_, won), stars = st.filter(Boolean).length;
+  const pieceScore = G_.found.reduce((a,f)=>a + Math.round(RAR[f.piece.r].value * f.hp/100), 0);
+  const timeBonus = won ? Math.round(G_.time*4) : 0, lifeBonus = won ? G_.hearts*50 : 0;
+  const score = won ? pieceScore + timeBonus + lifeBonus : 0;
+  const key = lvKey(G_.cfg.i), prev = P.done[key], newPieces = [];
+  G_.found.forEach(f => { if (!P.museum[f.piece.id]) newPieces.push(f.piece.id); P.museum[f.piece.id] = (P.museum[f.piece.id]||0)+1; });
+  const firstClear = won && !prev;
+  if (won && (!prev || score > prev.score || stars > prev.stars)) P.done[key] = {score:Math.max(score, prev?.score||0), stars:Math.max(stars, prev?.stars||0)};
+  P.runs.unshift({at:Date.now(), lvl:G_.cfg.i, score}); P.runs = P.runs.slice(0,30);
+  save(); pushScore();
+  won ? sfx.win() : sfx.lose();
+  modal = {type:"result", won, reason, stars, pieceScore, timeBonus, lifeBonus, score, best:P.done[key]?.score||0, newPieces,
+    unlockSite: firstClear && G_.cfg.l===2 && G_.cfg.s<4 ? SITES[G_.cfg.s+1] : null};
+  setTimeout(renderModal, 500);
+}
+
+/* ---------- Dig UI ---------- */
+function renderDigShell(cfg){
+  document.querySelector(".tabbar")?.remove();
+  app.innerHTML = `<div class="game">
+    <div class="hud">
+      <button class="round" id="pause" aria-label="Pause">${glyph("pause","#fff")}</button>
+      <div class="timer" id="timer"><span class="sunico"></span><div style="flex:1;min-width:0"><div class="eyebrow" style="font-size:10px">${cfg.site.name} · ${DIG_NAMES[cfg.l]}</div><div class="track"><i id="sunbar"></i></div></div><b id="tleft">${cfg.time}s</b></div>
+      <div class="hearts" id="hearts" aria-label="Lives"></div>
+    </div>
+    <div class="stage">
+      <div class="trench">
+        <canvas id="dig" width="${WW}" height="${WH}" aria-label="Dig site. Click or drag to dig with the selected tool."></canvas>
+        <div class="objectives" id="obj"></div>
+        <div class="bag" id="bag"></div>
+        <div class="toast hide" id="toast" role="status" aria-live="polite"></div>
+        <div class="findpop" id="findpop"></div>
+      </div>
+    </div>
+    <div class="hotbar" id="hotbar"></div>
+  </div>`;
+  cv = document.getElementById("dig"); cx = cv.getContext("2d");
+  soilC = document.createElement("canvas"); soilC.width = GW; soilC.height = GH; soilX = soilC.getContext("2d"); soilImg = soilX.createImageData(GW, GH);
+  cx.fillStyle = "#3a2618"; cx.fillRect(0,0,WW,WH); cx.fillStyle = "#f2e2c4"; cx.font = "600 22px Readex Pro, sans-serif"; cx.textAlign = "center"; cx.fillText("Preparing the trench…", WW/2, WH/2);
+  bindCanvas();
+  document.getElementById("pause").onclick = () => { if (!G_ || G_.over) return; G_.paused = true; modal = {type:"pause"}; renderModal(); };
+}
+function toast(text, kind=""){
+  const t = document.getElementById("toast"); if (!t) return;
+  t.textContent = text; t.className = "toast " + kind; G_.msgT = 4.5;
+}
+function paintTimer(){
+  const bar = document.getElementById("sunbar"); if (!bar) return;
+  bar.style.transform = `scaleX(${Math.max(0, Math.min(1, G_.time/G_.cfg.time))})`;
+  document.getElementById("timer").classList.toggle("low", G_.time <= 15);
+  document.getElementById("tleft").textContent = `${Math.ceil(G_.time)}s`;
+}
+function paintHud(){
+  document.getElementById("hearts").innerHTML = [0,1,2].map(k => glyph("heart", k < G_.hearts ? "#ff5d6c" : "rgba(255,255,255,.18)")).join("");
+  const c = G_.cfg, st = starsFor(G_, G_.found.length>=need(c)), cracked = G_.found.some(f=>f.hp<75);
+  document.getElementById("obj").innerHTML = `
+    <span class="chip ${st[0]?"done":""}">${glyph("star","#ffd66b").replace("<svg","<svg width='14' height='14'")} Find ${need(c)} pieces · ${Math.min(G_.found.length,need(c))}/${need(c)}</span>
+    <span class="chip ${cracked?"lost":(st[1]?"done":"")}">${glyph("star","#ffd66b").replace("<svg","<svg width='14' height='14'")} Keep all 75%+ intact</span>
+    <span class="chip ${st[2]?"done":""}">${glyph("star","#ffd66b").replace("<svg","<svg width='14' height='14'")} Find all ${c.pieces} · ${G_.found.length}/${c.pieces}</span>`;
+  paintTools();
+}
+function paintTools(){
+  const h = document.getElementById("hotbar"); if (!h || !G_) return;
+  const t = (id,label,key,extra="") => `<button class="tool ${G_.tool===id?"on":""}" data-tool="${id}" aria-pressed="${G_.tool===id}" ${id==="scan"&&G_.scans<=0?"disabled":""}><kbd>${key}</kbd>${extra}<span class="face">${glyph(id, id==="trowel"?"#d6d9e0":id==="brush"?"#f0c77a":"#8cdcff")}</span>${label}</button>`;
+  h.innerHTML = t("scan","Scan","1",`<span class="count">${G_.scans}</span>`) + t("trowel","Trowel · fast","2") + t("brush","Brush · safe","3")
+    + (G_.found.length >= need(G_.cfg) && !G_.over ? `<button class="gbtn sm finishbtn" id="finish">Finish dig ${glyph("play","#2a1405").replace("<svg","<svg width='16' height='16'")}</button>` : "");
+  h.querySelectorAll(".tool").forEach(b => b.onclick = () => { G_.tool = b.dataset.tool; sfx.tap(); paintTools(); });
+  const f = document.getElementById("finish"); if (f) f.onclick = () => endLevel("finish");
+}
+function paintBag(){
+  const b = document.getElementById("bag"); if (!b) return;
+  b.innerHTML = G_.found.length ? G_.found.map(f => `<span class="slot r-${f.piece.r}" title="${f.piece.name} · ${f.hp}%"><span>${glyph(f.piece.g, pieceColor(f.piece))}</span></span>`).join("") : `<span class="empty">Bag is empty</span>`;
+}
+function showFind(piece, hp){
+  const fp = document.getElementById("findpop"); if (!fp) return;
+  fp.innerHTML = `<div class="card r-${piece.r}"><div class="in">${glyph(piece.g, pieceColor(piece))}<span class="rar">${RAR[piece.r].label}</span><b>${piece.name}</b><span class="muted">${hp}% intact</span></div></div>`;
+}
+
+/* ---------- Menus ---------- */
+function starRow(n, of=3){ return `<span class="stars" aria-label="${n} of ${of} stars">${"★".repeat(n)}<span class="off">${"★".repeat(of-n)}</span></span>`; }
+function netBadge(){
+  if (!navigator.onLine) return `<span class="net off"><i></i>Offline</span>`;
+  return online ? `<span class="net on"><i></i>Online</span>` : `<span class="net"><i></i>Solo</span>`;
+}
+function topbar(){
+  return `<div class="topbar">
+    <button class="player" id="go-settings" aria-label="Player settings"><span class="avatar">${(P.nick[0]||"D").toUpperCase()}</span><span class="pname"><b></b><span>Site ${sitesOpen()} of 5 · ${netBadge()}</span></span></button>
+    <div class="res">
+      <span class="pill" title="Stars">${glyph("star","#ffd66b")}${totalStars()}/45</span>
+      <span class="pill hide-sm" title="Score">${glyph("coinico","#ffd66b")}${totalScore().toLocaleString()}</span>
+      <span class="pill" title="Legendary finds">${glyph("gem","#ffb13d")}${legendCount()}/5</span>
+    </div></div>`;
+}
+function tabbar(){
+  const t = (id,ico,label) => `<button class="tab ${view===id?"on":""}" data-view="${id}">${glyph(ico, view===id?"#ffd66b":"#b9b0cf")}<span>${label}</span></button>`;
+  return `<nav class="tabbar" aria-label="Main"><div class="tabs">
+    ${t("home","star","Home")}${t("map","map","Map")}
+    <button class="tab play" id="tab-play" aria-label="Play next dig"><span class="disc">${glyph("play","#2a1405")}</span><span>Play</span></button>
+    ${t("museum","museum","Museum")}${t("ranks","trophy","Ranks")}
+  </div></nav>`;
+}
+function heroScene(){
+  return `<svg class="scene" viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="hs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a1d5c"/><stop offset=".5" stop-color="#8a3e6a"/><stop offset=".8" stop-color="#e8743f"/><stop offset="1" stop-color="#ffc66b"/></linearGradient>
+      <radialGradient id="sunG"><stop offset="0" stop-color="#fff6d0"/><stop offset=".5" stop-color="#ffc35c"/><stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/></radialGradient>
+      <linearGradient id="d1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d98a4c"/><stop offset="1" stop-color="#8a4a2c"/></linearGradient>
+      <linearGradient id="d2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b8653a"/><stop offset="1" stop-color="#5e2f22"/></linearGradient>
+      <linearGradient id="d3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6e3826"/><stop offset="1" stop-color="#2a1530"/></linearGradient>
+    </defs>
+    <rect width="400" height="220" fill="url(#hs)"/>
+    <circle cx="290" cy="130" r="70" fill="url(#sunG)"/><circle cx="290" cy="130" r="26" fill="#fff0c0"/>
+    <path d="M0 150 C60 120 110 140 170 128 S290 110 400 140 V220 H0Z" fill="url(#d1)"/>
+    <path d="M0 175 C80 150 150 172 230 160 S340 150 400 170 V220 H0Z" fill="url(#d2)"/>
+    <path d="M0 200 C90 185 170 205 260 192 S360 186 400 196 V220 H0Z" fill="url(#d3)"/>
+    <g fill="#2a1530" opacity=".85"><rect x="52" y="150" width="3" height="24"/><path d="M53 150c-10-2-14 3-16 6 6-4 10-4 16-6zm0 0c10-3 15 1 17 4-6-3-11-3-17-4zm0 0c-4-8-11-9-14-8 6 1 10 4 14 8zm0 0c5-8 12-8 15-6-7 0-11 3-15 6z"/></g>
+    <g opacity=".7"><circle cx="40" cy="30" r="1" fill="#fff"/><circle cx="120" cy="18" r="1.2" fill="#fff"/><circle cx="200" cy="40" r=".8" fill="#fff"/><circle cx="340" cy="22" r="1" fill="#fff"/><circle cx="80" cy="60" r=".8" fill="#fff"/></g>
+  </svg>`;
+}
+function nextLevel(){ return Math.min(14, levelsWon()); }
+function renderShell(body){
+  app.innerHTML = `<div class="shell">${topbar()}<div class="page">${body}</div></div>${tabbar()}`;
+  app.querySelector(".pname b").textContent = P.nick;
+  app.querySelectorAll(".tab[data-view]").forEach(b => b.onclick = () => { sfx.tap(); view = b.dataset.view; render(); });
+  document.getElementById("tab-play").onclick = () => { sfx.tap(); openLevel(nextLevel()); };
+  document.getElementById("go-settings").onclick = () => { modal = {type:"settings"}; renderModal(); };
+}
+function renderHome(){
+  const n = nextLevel(), c = levelCfg(n), d = P.done[lvKey(n)];
+  renderShell(`
+    <div class="hero">${heroScene()}
+      <div class="logo">Biqsha <span lang="ar" style="font-size:40px">بقشة</span><small>Dig before sunset</small></div>
+    </div>
+    <div class="panel nextcard">
+      <div><div class="eyebrow">Next dig · ${c.site.area}</div><h2>${c.site.name} · ${DIG_NAMES[c.l]}</h2><div class="row" style="display:flex;gap:10px;align-items:center;margin-top:4px">${starRow(d?.stars||0)}<span class="muted">${c.time}s · find ${need(c)} of ${c.pieces}</span></div></div>
+      <button class="gbtn big" id="home-play">${glyph("play","#2a1405").replace("<svg","<svg width='26' height='26'")}Play</button>
+    </div>
+    <div class="progress">
+      <div class="prog"><span class="eyebrow">Sites</span><b>${sitesOpen()}/5</b><div class="bar"><i style="width:${sitesOpen()/5*100}%"></i></div></div>
+      <div class="prog"><span class="eyebrow">Museum</span><b>${museumCount()}/25</b><div class="bar"><i style="width:${museumCount()/25*100}%"></i></div></div>
+      <div class="prog"><span class="eyebrow">Stars</span><b>${totalStars()}/45</b><div class="bar"><i style="width:${totalStars()/45*100}%"></i></div></div>
+    </div>`);
+  document.getElementById("home-play").onclick = () => { sfx.tap(); openLevel(n); };
+}
+function mapSvg(){
+  const won = levelsWon(), open = SITES.map((s,i)=> won >= i*3);
+  return `<svg viewBox="0 0 400 300" role="img" aria-label="Map of excavation sites in the UAE">
+  <defs>
+    <linearGradient id="sea" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d3f6e"/><stop offset="1" stop-color="#2a1f5a"/></linearGradient>
+    <linearGradient id="land" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0c27a"/><stop offset="1" stop-color="#c47a45"/></linearGradient>
+    <mask id="fog"><rect width="400" height="300" fill="white"/>${SITES.map((s,i)=>open[i]?`<circle cx="${s.x}" cy="${s.y}" r="54" fill="black"/>`:"").join("")}</mask>
+    <filter id="soft"><feGaussianBlur stdDeviation="6"/></filter>
+  </defs>
+  <rect width="400" height="300" fill="url(#sea)"/>
+  <text x="110" y="70" fill="#7fa0d0" font-size="11" letter-spacing="3" opacity=".7">ARABIAN GULF</text>
+  <path d="M338 30 L300 66 L272 98 L232 132 L190 158 L150 172 L100 182 L58 188 L26 198 L22 216 L40 264 L210 284 L300 252 L336 216 L346 172 L368 140 L362 96 L352 56 Z" fill="url(#land)" stroke="#ffe0a8" stroke-width="1.5"/>
+  <g mask="url(#fog)"><rect width="400" height="300" fill="#1a1433" opacity=".78" filter="url(#soft)"/></g>
+  <polyline points="${SITES.map(s=>`${s.x},${s.y}`).join(" ")}" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="3 6" stroke-linecap="round" opacity=".8"/>
+  ${SITES.map((s,i)=>{
+    const st = [0,1,2].reduce((a,l)=>a+(P.done[lvKey(i*3+l)]?.stars||0),0), sel = i===selSite;
+    const lx = s.x > 300 ? s.x - 16 : s.x + 16, anchor = s.x > 300 ? "end" : "start";
+    return `<g class="site-node ${open[i]?"":"locked"}" data-site="${i}" tabindex="0" role="button" aria-label="${s.name}${open[i]?"":" locked"}">
+      ${sel?`<circle cx="${s.x}" cy="${s.y}" r="19" fill="none" stroke="#ffd66b" stroke-width="3"><animate attributeName="r" values="16;21;16" dur="1.6s" repeatCount="indefinite"/></circle>`:""}
+      <circle cx="${s.x}" cy="${s.y+2}" r="13" fill="#000" opacity=".35"/>
+      <circle cx="${s.x}" cy="${s.y}" r="13" fill="${open[i]?"#ffb13d":"#4a4470"}" stroke="#fff" stroke-width="2.5"/>
+      <text x="${s.x}" y="${s.y+4.5}" text-anchor="middle" font-size="12" font-weight="700" fill="${open[i]?"#2a1405":"#a9a2cc"}">${open[i]? i+1 : "?"}</text>
+      <text x="${lx}" y="${s.y-6}" text-anchor="${anchor}" font-size="12" font-weight="700" fill="#fff" stroke="#1a1433" stroke-width="3" paint-order="stroke">${s.name}</text>
+      ${open[i]?`<text x="${lx}" y="${s.y+10}" text-anchor="${anchor}" font-size="10" fill="#ffd66b" stroke="#1a1433" stroke-width="2.5" paint-order="stroke">★ ${st}/9</text>`:""}
+    </g>`;}).join("")}
+  </svg>`;
+}
+function renderMap(){
+  const won = levelsWon(), s = SITES[selSite], open = won >= selSite*3;
+  renderShell(`
+    <div class="mapwrap">${mapSvg()}</div>
+    <div class="panel" style="display:flex;flex-direction:column;gap:14px">
+      <div style="text-align:center"><div class="eyebrow">Site ${selSite+1} · ${s.area} · ${s.era}</div><h2 style="font-size:26px">${s.name}</h2></div>
+      ${open ? `<div class="levels">${[0,1,2].map(l=>{
+        const i = selSite*3+l, d = P.done[lvKey(i)], unlocked = i <= unlockedUpTo();
+        return `<button class="lvl" data-lvl="${i}" ${unlocked?"":"disabled"} aria-label="${DIG_NAMES[l]}${unlocked?"":" locked"}"><span class="node ${d?"done":unlocked?"":"locked"}">${unlocked? i+1 : "?"}</span>${starRow(d?.stars||0)}<small>${DIG_NAMES[l]}</small></button>`;}).join("")}</div>`
+        : `<p class="muted" style="text-align:center">Still under the sand. Clear all three digs at ${SITES[selSite-1].name} to open it.</p>`}
+    </div>`);
+  app.querySelectorAll(".site-node").forEach(n => {
+    const pick = () => { sfx.tap(); selSite = +n.dataset.site; renderMap(); };
+    n.addEventListener("click", pick);
+    n.addEventListener("keydown", e => { if (e.key==="Enter"||e.key===" "){ e.preventDefault(); pick(); } });
+  });
+  app.querySelectorAll(".lvl").forEach(b => b.onclick = () => { sfx.tap(); openLevel(+b.dataset.lvl); });
+}
+function pieceCard(p, extra=""){
+  return `<div class="card r-${p.r}"><div class="in">${glyph(p.g, pieceColor(p))}<span class="rar">${RAR[p.r].label}</span><b>${p.name}</b>${extra}</div></div>`;
+}
+function renderMuseum(){
+  renderShell(`
+    <div class="panel"><div class="eyebrow">Your collection</div><h2 style="font-size:26px">Museum · ${museumCount()} of 25</h2><p class="muted" style="margin:6px 0 0">Each site hides five pieces. Later sites and deep trenches raise the odds of Epic and Legendary finds.</p></div>
+    ${SITES.map(s=>`<div class="panel" style="display:flex;flex-direction:column;gap:10px"><h3 style="font-size:18px">${s.name} <span class="muted">· ${s.area}</span></h3>
+      <div class="cards">${PIECES.filter(p=>p.site===s.id).map(p => P.museum[p.id]
+        ? pieceCard(p, `<span class="muted">${p.fact}</span><span class="pill" style="height:24px;font-size:12px">×${P.museum[p.id]}</span>`)
+        : `<div class="card unknown"><div class="in"><div style="width:56px;height:56px;display:grid;place-items:center;font-family:var(--f-display);font-size:34px;color:var(--muted)">?</div><span class="rar" style="color:var(--r-${p.r})">${RAR[p.r].label}</span><b>Not found yet</b></div></div>`).join("")}</div></div>`).join("")}`);
+}
+function renderRanks(){
+  const rows = online ? board : [];
+  const top = rows.slice(0,3), rest = rows.slice(3);
+  renderShell(`
+    <div class="panel" style="text-align:center"><div class="eyebrow">All players</div><h2 style="font-size:26px">Leaderboard</h2></div>
+    ${online ? (rows.length ? `
+      <div class="podium">${[1,0,2].map(k => top[k] ? `<div class="pod p${k+1}"><span class="medal">${k+1}</span><span class="nm" data-i="${k}"></span><b>${(top[k].total||0).toLocaleString()}</b><span style="font-size:12px">★ ${top[k].stars||0}</span></div>` : `<div></div>`).join("")}</div>
+      <div style="display:flex;flex-direction:column;gap:6px">${rest.map((r,j)=>`<div class="lbrow ${r.id===me?"me":""}"><b style="font-family:var(--f-display)">${j+4}</b><span class="nm" data-i="${j+3}"></span><b>${(r.total||0).toLocaleString()}</b></div>`).join("")}</div>`
+      : `<div class="panel muted" style="text-align:center">No scores yet. Clear a dig and your score shows here for everyone.</div>`)
+    : `<div class="panel muted" style="text-align:center">The shared leaderboard needs the online version and a signed-in player. Your best digs on this device:</div>
+       <div style="display:flex;flex-direction:column;gap:6px">${Object.entries(P.done).sort((a,b)=>b[1].score-a[1].score).slice(0,10).map(([k,d],i)=>{const n=+k.slice(1);return `<div class="lbrow"><b style="font-family:var(--f-display)">${i+1}</b><span class="nm">${SITES[Math.floor(n/3)].name} · ${DIG_NAMES[n%3]} ${starRow(d.stars)}</span><b>${d.score.toLocaleString()}</b></div>`;}).join("") || `<p class="muted" style="text-align:center">No digs cleared yet.</p>`}</div>`}`);
+  app.querySelectorAll(".nm[data-i]").forEach(el => { el.textContent = rows[+el.dataset.i]?.nick || "Digger"; });
+}
+function render(){
+  if (view === "dig") return;
+  if (view === "home") renderHome();
+  else if (view === "map") renderMap();
+  else if (view === "museum") renderMuseum();
+  else if (view === "ranks") renderRanks();
+  renderModal();
+}
+function openLevel(i){ modal = {type:"level", i}; renderModal(); }
+
+/* ---------- Modals ---------- */
+function bigStars(n){ return `<div class="bigstars">${[0,1,2].map(k=>`<span class="${k<n?"on":""}">${glyph("star", k<n?"#ffd66b":"rgba(255,255,255,.15)")}</span>`).join("")}</div>`; }
+function renderModal(){
+  document.querySelectorAll(".ov").forEach(o=>o.remove());
+  if (!modal) return;
+  const o = document.createElement("div"); o.className = "ov";
+  const m = modal;
+  if (m.type === "level"){
+    const c = levelCfg(m.i), d = P.done[lvKey(m.i)];
+    o.innerHTML = `<div class="modal" role="dialog" aria-label="Dig ${m.i+1}"><div class="in">
+      <button class="round close" id="m-close" aria-label="Close">${glyph("x","#fff")}</button>
+      <div class="ribbon"><div class="eyebrow" style="color:#d8d0f5">${c.site.name} · ${c.site.area}</div><h2>Dig ${m.i+1} · ${DIG_NAMES[c.l]}</h2>${bigStars(d?.stars||0)}</div>
+      <div class="goals">
+        <div class="goal">${glyph("star","#ffd66b")}Find ${need(c)} of the ${c.pieces} buried pieces</div>
+        <div class="goal">${glyph("star","#ffd66b")}Keep every piece 75% intact or better</div>
+        <div class="goal">${glyph("star","#ffd66b")}Find all ${c.pieces} pieces</div>
+      </div>
+      <div class="infochips">
+        <span class="chip">${glyph("clock","#ffd66b").replace("<svg","<svg width='14' height='14'")} ${c.time}s daylight</span>
+        <span class="chip">${c.scans} scans</span>
+        <span class="chip" style="color:#ff9a8d">${c.snakes} snake${c.snakes>1?"s":""}</span>
+        ${c.scorpions?`<span class="chip" style="color:#ff9a8d">${c.scorpions} scorpion${c.scorpions>1?"s":""}</span>`:""}
+        ${c.storm?`<span class="chip" style="color:#ffd08a">Sandstorm</span>`:""}
+      </div>
+      ${d ? `<p class="muted" style="text-align:center;margin:0">Best score: ${d.score.toLocaleString()}</p>` : ""}
+      <div class="btnrow"><button class="gbtn big" id="m-play">${glyph("play","#2a1405").replace("<svg","<svg width='26' height='26'")}Play</button></div>
+    </div></div>`;
+  } else if (m.type === "pause"){
+    o.innerHTML = `<div class="modal" role="dialog" aria-label="Paused"><div class="in">
+      <div class="ribbon"><h2>Paused</h2><p class="muted" style="margin:4px 0 0">The sun stops while you are paused.</p></div>
+      <div style="display:flex;flex-direction:column;gap:12px;align-items:stretch">
+        <button class="gbtn big" id="m-resume">${glyph("play","#2a1405").replace("<svg","<svg width='24' height='24'")}Resume</button>
+        <button class="gbtn blue" id="m-restart">Restart dig</button>
+        <button class="gbtn blue" id="m-sound">${P.muted?"Sound: off":"Sound: on"}</button>
+        <button class="gbtn red" id="m-quit">Quit to map</button>
+      </div></div></div>`;
+  } else if (m.type === "tutorial"){
+    o.innerHTML = `<div class="modal" role="dialog" aria-label="How to dig"><div class="in">
+      <div class="ribbon"><h2>How to dig</h2><p class="muted" style="margin:4px 0 0">Find pieces before the sun sets.</p></div>
+      <div class="tutcards">
+        <div>${glyph("scan","#8cdcff")}<b>1 · Scan</b>Shows gold rings over pieces and red rings over snakes.</div>
+        <div>${glyph("trowel","#d6d9e0")}<b>2 · Trowel</b>Fast. Click or drag to scoop soil. It cracks pieces it hits.</div>
+        <div>${glyph("brush","#f0c77a")}<b>3 · Brush</b>Slow but safe. Hold and sweep when an outline shows through.</div>
+      </div>
+      <p class="muted" style="text-align:center;margin:0">Dark outlines in the soil mean something is close. Switch to the brush.</p>
+      <div class="btnrow"><button class="gbtn big" id="m-tut">Let's dig</button></div>
+    </div></div>`;
+  } else if (m.type === "settings"){
+    o.innerHTML = `<div class="modal" role="dialog" aria-label="Settings"><div class="in">
+      <button class="round close" id="m-close" aria-label="Close">${glyph("x","#fff")}</button>
+      <div class="ribbon"><h2>Settings</h2></div>
+      <label for="nick" class="eyebrow">Player name</label>
+      <div style="display:flex;gap:8px"><input type="text" id="nick" maxlength="20"><button class="gbtn sm" id="m-savenick">Save</button></div>
+      <div class="setrow"><span>Sound</span><button class="switch ${P.muted?"":"on"}" id="m-mute" aria-pressed="${!P.muted}" aria-label="Sound"></button></div>
+      <div class="setrow"><span>How to dig</span><button class="gbtn sm blue" id="m-howto">Show</button></div>
+      <div class="setrow" style="border:0"><span>Reset all progress</span><button class="gbtn sm red" id="m-reset">${m.confirmReset?"Tap again to confirm":"Reset"}</button></div>
+    </div></div>`;
+  } else if (m.type === "result"){
+    const c = G_.cfg, why = {sunset:"The sun set before you found enough pieces.", hearts:"You ran out of lives. Brush over red rings next time.", all:"You found every piece in this trench!", finish:"Dig closed and logged."}[m.reason];
+    o.innerHTML = `<div class="modal" role="dialog" aria-label="Dig result"><div class="in">
+      <div class="ribbon ${m.won?"win":"lose"}"><div class="eyebrow" style="color:#fff">${c.site.name} · ${DIG_NAMES[c.l]}</div><h2>${m.won?"Find logged!":"Dig failed"}</h2>${bigStars(m.stars)}<p style="margin:6px 0 0;font-size:13px">${why}</p></div>
+      ${G_.found.length ? `<div class="cards">${G_.found.map((f,i)=>`<div class="card flip r-${f.piece.r}" style="animation-delay:${.3+i*.15}s"><div class="in">${glyph(f.piece.g, pieceColor(f.piece))}<span class="rar">${RAR[f.piece.r].label}${m.newPieces.includes(f.piece.id) && G_.found.findIndex(x=>x.piece.id===f.piece.id)===i?" · New":""}</span><b>${f.piece.name}</b><span class="muted">${f.hp}% intact</span></div></div>`).join("")}</div>` : ""}
+      ${m.won ? `<div><div class="score"><span>Pieces (value × intact)</span><span>${m.pieceScore}</span></div><div class="score"><span>Daylight left</span><span>${m.timeBonus}</span></div><div class="score"><span>Lives left</span><span>${m.lifeBonus}</span></div><div class="score total"><span>Score</span><span>${m.score.toLocaleString()}</span></div></div>` : `<p class="muted" style="text-align:center;margin:0">Pieces you found still go to your museum.</p>`}
+      ${m.unlockSite ? `<div class="chip done" style="justify-self:center;margin:0 auto">New site unlocked: ${m.unlockSite.name}</div>` : ""}
+      <div class="btnrow">
+        <button class="gbtn blue" id="m-retry">Retry</button>
+        <button class="gbtn blue" id="m-map">Map</button>
+        ${m.won && c.i < 14 ? `<button class="gbtn" id="m-next">Next ${glyph("play","#2a1405").replace("<svg","<svg width='18' height='18'")}</button>` : ""}
+      </div></div></div>`;
+  }
+  document.body.appendChild(o);
+  const q = id => o.querySelector("#"+id), on = (id,fn) => { const b = q(id); if (b) b.onclick = () => { sfx.tap(); fn(); }; };
+  on("m-close", () => { modal = null; renderModal(); });
+  on("m-play", () => startLevel(m.i));
+  on("m-resume", () => { modal = null; G_.paused = false; G_.last = performance.now(); renderModal(); });
+  on("m-restart", () => startLevel(G_.cfg.i));
+  on("m-retry", () => startLevel(G_.cfg.i));
+  on("m-next", () => startLevel(G_.cfg.i + 1));
+  on("m-quit", () => leaveDig(G_.cfg.s));
+  on("m-map", () => leaveDig(m.unlockSite ? G_.cfg.s+1 : G_.cfg.s));
+  on("m-sound", () => { P.muted = !P.muted; save(); renderModal(); });
+  on("m-tut", () => { P.tut = true; save(); modal = null; renderModal(); if (G_){ G_.paused = false; G_.last = performance.now(); toast("Scan first, then dig. Brush the last layer when you see an outline."); } });
+  on("m-mute", () => { P.muted = !P.muted; save(); renderModal(); });
+  on("m-howto", () => { modal = {type:"tutorial"}; renderModal(); });
+  on("m-reset", () => { if (!m.confirmReset){ m.confirmReset = true; renderModal(); return; } const nick = P.nick; P = blank(); P.nick = nick; save(); modal = null; render(); });
+  if (q("nick")){ q("nick").value = P.nick; on("m-savenick", () => { const v = q("nick").value.trim().slice(0,20); if (v){ P.nick = v; save(); lastPushed = -1; pushScore(); modal = null; render(); } }); }
+  o.addEventListener("click", e => { if (e.target === o && (m.type==="level"||m.type==="settings")){ modal = null; renderModal(); } });
+  (q("m-play")||q("m-resume")||q("m-next")||q("m-tut")||o.querySelector(".gbtn"))?.focus();
+}
+function leaveDig(site){ cancelAnimationFrame(raf); selSite = site; G_ = null; modal = null; view = "map"; render(); }
+
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "Escape" && modal && (modal.type==="level"||modal.type==="settings")){ modal = null; renderModal(); return; }
+  if (view !== "dig" || !G_ || G_.over) return;
+  if (e.key === "Escape"){ if (modal?.type === "pause"){ modal = null; G_.paused = false; G_.last = performance.now(); } else if (!modal){ G_.paused = true; modal = {type:"pause"}; } renderModal(); return; }
+  if (modal) return;
+  const k = {"1":"scan","2":"trowel","3":"brush"}[e.key];
+  if (k && !(k==="scan" && G_.scans<=0)){ G_.tool = k; paintTools(); }
+});
+document.addEventListener("visibilitychange", () => { if (document.hidden && G_ && !G_.over && !modal){ G_.paused = true; modal = {type:"pause"}; renderModal(); } });
+
+function start(){ selSite = Math.min(4, Math.floor(unlockedUpTo()/3)); render(); connect(); }
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start();
+})();
+</script>
+
+</body></html>
