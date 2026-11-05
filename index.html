@@ -161,6 +161,9 @@ input[type=text]{background:rgba(0,0,0,.35);border:1px solid var(--edge);border-
 .chip.done{background:linear-gradient(90deg,#2a7a40,#3fbf62);border-color:transparent}
 .chip.lost{background:linear-gradient(90deg,#7a1f22,#b03030);border-color:transparent;text-decoration:line-through}
 .bag{position:absolute;bottom:10px;right:10px;display:flex;gap:6px;padding:6px;border-radius:14px;background:rgba(10,8,25,.72);border:1px solid var(--edge);min-height:52px;align-items:center}
+.bag.duo{flex-direction:column;align-items:stretch;gap:4px;max-width:min(92%,280px)}
+.bagrow{display:flex;gap:6px;align-items:center}
+.bagrow b{font-size:11px;min-width:52px;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bag .slot{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;padding:2px;background:var(--g-common)}
 .bag .slot.r-rare{background:var(--g-rare)} .bag .slot.r-epic{background:var(--g-epic)} .bag .slot.r-legendary{background:var(--g-legendary)}
 .bag .slot span{width:100%;height:100%;border-radius:8px;background:#1b1640;display:grid;place-items:center}
@@ -313,7 +316,7 @@ const pieceColor = p => p.m || MAT[p.g] || "#b5653a";
 
 /* ---------- Storage (offline first) ---------- */
 const KEY = "biqsha-progress-v1";
-const blank = () => ({done:{}, museum:{}, nick:"", muted:false, runs:[], tut:false});
+const blank = () => ({done:{}, museum:{}, nick:"", p2:"", muted:false, runs:[], tut:false});
 let P = blank();
 try { const raw = localStorage.getItem(KEY); if (raw) P = Object.assign(blank(), JSON.parse(raw)); } catch {}
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(P)); } catch {} }
@@ -406,12 +409,21 @@ function levelCfg(i){
     storm: s>=3};
 }
 const need = cfg => cfg.pieces - 1;
-function rollPiece(site, weights){
-  let n = Math.random()*100, idx = 0;
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function rollPiece(site, weights, rnd){
+  const rand = rnd || Math.random;
+  let n = rand()*100, idx = 0;
   for (; idx<4; idx++){ n -= weights[idx]; if (n < 0) break; }
   const r = ["common","rare","epic","legendary"][Math.min(idx,3)];
   const pool = PIECES.filter(p=>p.site===site.id && p.r===r);
-  return pool[Math.floor(Math.random()*pool.length)];
+  return pool[Math.floor(rand()*pool.length)];
 }
 
 /* ---------- Trench simulation ---------- */
@@ -435,8 +447,9 @@ function itemGlyph(it){
   if (it.t==="scorpion") return glyphImg("scorpion","#3d2a1a");
   return glyphImg("flask","#3f8fa0");
 }
-async function buildLevel(cfg){
-  const noise = makeNoise(1 + Math.floor(Math.random()*1e6));
+async function buildLevel(cfg, seed){
+  const rnd = seed == null ? Math.random : mulberry32(seed >>> 0);
+  const noise = makeNoise(seed == null ? 1 + Math.floor(Math.random()*1e6) : ((seed >>> 0) || 1));
   const T = new Float32Array(GW*GH), T0 = new Float32Array(GW*GH), bed = new Float32Array(GW*GH), grain = new Float32Array(GW*GH);
   const D = cfg.site.depth;
   for (let y=0;y<GH;y++) for (let x=0;x<GW;x++){
@@ -444,31 +457,31 @@ async function buildLevel(cfg){
     const mound = noise(wx*.0045, wy*.0045, 3), detail = noise(wx*.025+90, wy*.025+30, 2);
     T0[i] = T[i] = D*(.55 + .45*mound + .12*detail);
     bed[i] = .35*noise(wx*.006+200, wy*.006+200, 2);
-    grain[i] = (Math.random()-.5)*.08 + (noise(wx*.08+400, wy*.08, 1)-.5)*.12;
+    grain[i] = (rnd()-.5)*.08 + (noise(wx*.08+400, wy*.08, 1)-.5)*.12;
   }
   // Place items with spacing
   const items = [], spots = [];
   const place = (size) => {
     for (let t=0;t<400;t++){
-      const x = 70 + Math.random()*(WW-140), y = 70 + Math.random()*(WH-140);
+      const x = 70 + rnd()*(WW-140), y = 70 + rnd()*(WH-140);
       if (spots.every(s => Math.hypot(s.x-x, s.y-y) > (s.size+size)/2 + 26)){ spots.push({x,y,size}); return {x,y}; }
     }
-    return {x:70+Math.random()*(WW-140), y:70+Math.random()*(WH-140)};
+    return {x:70+rnd()*(WW-140), y:70+rnd()*(WH-140)};
   };
   const used = new Set();
   for (let p=0;p<cfg.pieces;p++){
-    let piece = rollPiece(cfg.site, cfg.site.weights);
-    if (p===0 && cfg.l===2 && piece.r==="common") piece = rollPiece(cfg.site,[0,60,30,10]);
-    for (let t=0; t<6 && used.has(piece.id); t++) piece = rollPiece(cfg.site, cfg.site.weights);
+    let piece = rollPiece(cfg.site, cfg.site.weights, rnd);
+    if (p===0 && cfg.l===2 && piece.r==="common") piece = rollPiece(cfg.site,[0,60,30,10], rnd);
+    for (let t=0; t<6 && used.has(piece.id); t++) piece = rollPiece(cfg.site, cfg.site.weights, rnd);
     used.add(piece.id);
-    const size = 92 + Math.random()*22;
-    items.push({t:"piece", piece, size, ...place(size), rot:(Math.random()-.5)*1.4, hp:100, cracks:[]});
+    const size = 92 + rnd()*22;
+    items.push({t:"piece", piece, size, ...place(size), rot:(rnd()-.5)*1.4, hp:100, cracks:[]});
   }
-  for (let p=0;p<cfg.snakes;p++){ const size = 104; items.push({t:"snake", size, ...place(size), rot:Math.random()*6.28}); }
-  for (let p=0;p<cfg.scorpions;p++){ const size = 76; items.push({t:"scorpion", size, ...place(size), rot:Math.random()*6.28}); }
-  for (let p=0;p<cfg.water;p++){ const size = 64; items.push({t:"water", size, ...place(size), rot:(Math.random()-.5)*1.2}); }
+  for (let p=0;p<cfg.snakes;p++){ const size = 104; items.push({t:"snake", size, ...place(size), rot:rnd()*6.28}); }
+  for (let p=0;p<cfg.scorpions;p++){ const size = 76; items.push({t:"scorpion", size, ...place(size), rot:rnd()*6.28}); }
+  for (let p=0;p<cfg.water;p++){ const size = 64; items.push({t:"water", size, ...place(size), rot:(rnd()-.5)*1.2}); }
   await Promise.all(items.map(it => ready(itemGlyph(it))));
-  const lv = {T, T0, bed, grain, items, mask:new Int16Array(GW*GH), floor:makeFloor(cfg)};
+  const lv = {T, T0, bed, grain, items, mask:new Int16Array(GW*GH), floor:makeFloor(cfg, rnd)};
   rebuildMasks(lv);
   return lv;
 }
@@ -485,35 +498,57 @@ function rebuildMasks(lv){
     for (let i=0;i<GW*GH;i++) if (d[i*4+3] > 90 && !lv.mask[i]){ lv.mask[i] = n+1; it.px.push(i); }
   });
 }
-function makeFloor(cfg){
+function makeFloor(cfg, rnd){
+  rnd = rnd || Math.random;
   const c = document.createElement("canvas"); c.width = WW; c.height = WH;
   const x = c.getContext("2d");
   const deep = cfg.site.soil[4];
   const g = x.createRadialGradient(WW/2, WH/2, 60, WW/2, WH/2, WW*.7);
   g.addColorStop(0, shade(deep, 1.05)); g.addColorStop(1, shade(deep, .55));
   x.fillStyle = g; x.fillRect(0,0,WW,WH);
-  for (let k=0;k<900;k++){ x.fillStyle = `rgba(${Math.random()<.5?"0,0,0":"255,230,200"},${Math.random()*.12})`; const r = Math.random()*3+.5; x.beginPath(); x.arc(Math.random()*WW, Math.random()*WH, r, 0, 6.28); x.fill(); }
+  for (let k=0;k<900;k++){ x.fillStyle = `rgba(${rnd()<.5?"0,0,0":"255,230,200"},${rnd()*.12})`; const r = rnd()*3+.5; x.beginPath(); x.arc(rnd()*WW, rnd()*WH, r, 0, 6.28); x.fill(); }
   return c;
 }
 function hex(c){ const n = parseInt(c.slice(1),16); return [n>>16, (n>>8)&255, n&255]; }
 function shade(c,f){ const [r,g,b] = hex(c); return `rgb(${Math.min(255,r*f)|0},${Math.min(255,g*f)|0},${Math.min(255,b*f)|0})`; }
 
 /* ---------- Game state ---------- */
-let view = "home", selSite = 0, G_ = null, raf = 0, modal = null, popup = null;
+let view = "home", selSite = 0, G_ = null, raf = 0, modal = null, popup = null, pendingDuo = null;
 const app = document.getElementById("app");
 let cv, cx, soilC, soilX, soilImg, strata;
 
-async function startLevel(i){
+function pairNames(){
+  if (G_?.duo) return G_.duo.names;
+  if (G_?.net) return G_.net.names;
+  return null;
+}
+function diggerWho(it){
+  if (G_?.net){
+    const a = G_.ptr, b = G_.remote;
+    const da = a?.in ? Math.hypot(a.x-it.x, a.y-it.y) : 1e9;
+    const db = b?.in ? Math.hypot(b.x-it.x, b.y-it.y) : 1e9;
+    return db < da ? 1 : 0;
+  }
+  return G_?.duo ? G_.duo.turn : null;
+}
+async function startLevel(i, opt){
+  const names = pendingDuo;
+  pendingDuo = null;
+  const net = opt?.net || null;
   modal = null; popup = null;
+  renderModal();
   const cfg = levelCfg(i);
   view = "dig"; renderDigShell(cfg);
-  const lv = await buildLevel(cfg);
+  const lv = await buildLevel(cfg, opt?.seed);
   G_ = {cfg, lv, tool:"trowel", time:cfg.time, hearts:3, scans:cfg.scans, found:[], over:false, paused:false,
         last:performance.now(), stormDone:!cfg.storm, lowWarned:false, tick:0,
+        duo: names && !net ? {names:[...names], turn:0, left:15, turnLen:15} : null,
+        net, remote:{x:-99,y:-99,down:false,in:false,tool:"brush",lastScoop:null},
         ptr:{x:-99,y:-99,down:false,in:false,lastScoop:null}, particles:[], actors:[], pulses:[], trails:[], dirty:true, msgT:0};
   strata = buildStrata(cfg.site.soil);
   paintHud(); paintTools(); paintBag();
-  if (!P.tut){ G_.paused = true; modal = {type:"tutorial"}; renderModal(); }
+  if (net) toast(net.role === "host" ? "You are both in the trench. Dig at the same time." : "You are in. Your cursor is live.");
+  else if (!P.tut){ G_.paused = true; modal = {type:"tutorial"}; renderModal(); }
   else toast(i===0 ? "Scan first, then dig. Brush the last layer when you see an outline." : `Find ${need(cfg)} pieces before sunset.`);
   cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
 }
@@ -554,7 +589,8 @@ function scoop(x,y){
       const dmg = Math.min(40, 10 + n*.5);
       it.hp = Math.max(15, Math.round(it.hp - dmg)); sfx.crack(); shakeStage();
       it.cracks.push({a:Math.random()*6.28, l:.3+Math.random()*.25});
-      toast(`Crack! The trowel hit the ${it.piece.name.toLowerCase()} (${it.hp}% intact). Use the brush when you see an outline.`, "bad");
+      const who = G_.duo ? G_.duo.names[G_.duo.turn] + "'s trowel" : "The trowel";
+      toast(`Crack! ${who} hit the ${it.piece.name.toLowerCase()} (${it.hp}% intact). Use the brush when you see an outline.`, "bad");
     } else if (it.t === "snake" || it.t === "scorpion"){
       G_.hearts--; G_.time = Math.max(0, G_.time - 5); sfx.bite(); shakeStage(); paintHud();
       toast(`${it.t==="snake"?"A snake bit you":"A scorpion stung you"}! −1 life, −5 s. Brush over red marks to stay safe.`, "bad");
@@ -600,7 +636,8 @@ function checkItems(){
 function clearUnder(it){ for (const i of it.px) G_.lv.T[i] = 0; G_.dirty = true; }
 function collect(it){
   it.got = true; clearUnder(it);
-  G_.found.push({piece:it.piece, hp:it.hp});
+  const who = diggerWho(it);
+  G_.found.push({piece:it.piece, hp:it.hp, who});
   sfx.find(it.piece.r);
   if (it.piece.r === "legendary" || it.piece.r === "epic") burst();
   sparkle(it.x, it.y, it.piece.r);
@@ -655,7 +692,17 @@ function sandstorm(){
 function loop(now){
   if (!G_ || view !== "dig") return;
   const dt = Math.min(.05, (now - G_.last)/1000); G_.last = now;
-  const live = !G_.paused && !G_.over && !modal;
+  const sim = !G_.net || G_.net.role === "host";
+  if (sim && !G_.paused && !G_.over && !modal && G_.duo && !G_.net){
+    G_.duo.left -= dt;
+    if (G_.duo.left <= 0){
+      G_.duo.left = 0;
+      G_.paused = true;
+      modal = {type:"pass"};
+      renderModal();
+    }
+  }
+  const live = sim && !G_.paused && !G_.over && !modal;
   if (live){
     G_.time -= dt;
     if (G_.time <= 15 && Math.floor(G_.time) !== G_.tick){ G_.tick = Math.floor(G_.time); if (G_.time > 0) sfx.tick(); }
@@ -663,8 +710,15 @@ function loop(now){
     if (!G_.stormDone && G_.time <= G_.cfg.time/2){ G_.stormDone = true; sandstorm(); }
     if (G_.ptr.down && G_.tool === "brush" && G_.ptr.in){ brushAt(G_.ptr.x, G_.ptr.y, dt); G_.brushCheck = (G_.brushCheck||0) + dt; if (G_.brushCheck > .12){ G_.brushCheck = 0; checkItems(); } }
     if (G_.time <= 0){ G_.time = 0; endLevel("sunset"); }
+    if (G_.net && G_.remote?.down && G_.remote.in && G_.remote.tool === "brush"){
+      brushAt(G_.remote.x, G_.remote.y, dt);
+      G_.remote.brushCheck = (G_.remote.brushCheck||0) + dt;
+      if (G_.remote.brushCheck > .12){ G_.remote.brushCheck = 0; checkItems(); }
+    }
     paintTimer();
+    if (G_.net?.role === "host") netBroadcast();
   }
+  if (G_.net?.role === "guest" && !G_.over) paintTimer();
   if (G_.msgT > 0){ G_.msgT -= dt; if (G_.msgT <= 0) document.getElementById("toast")?.classList.add("hide"); }
   draw(dt, now/1000);
   raf = requestAnimationFrame(loop);
@@ -757,16 +811,18 @@ function draw(dt, now){
   cx.fillStyle = v; cx.fillRect(0,0,WW,WH);
   // Sand haze during storm
   if (G_.storm > 0){ G_.storm -= dt; cx.fillStyle = "rgba(220,180,120,.35)"; for (let k=0;k<60;k++){ const y = Math.random()*WH, x = Math.random()*WW; cx.fillRect(x, y, 40+Math.random()*80, 2); } }
-  // Tool cursor
-  const pt = G_.ptr;
-  if (pt.in && !G_.over){
-    const r = G_.tool==="trowel" ? TROWEL.r : G_.tool==="brush" ? BRUSH.r : 26;
-    cx.save(); cx.strokeStyle = G_.tool==="scan" ? "rgba(140,220,255,.9)" : "rgba(255,255,255,.75)"; cx.lineWidth = 2; cx.setLineDash(G_.tool==="brush"?[4,4]:[]);
-    cx.beginPath(); cx.arc(pt.x, pt.y, r, 0, 6.28); cx.stroke(); cx.setLineDash([]);
-    const ti = glyphImg(G_.tool, G_.tool==="trowel" ? "#c9ccd4" : G_.tool==="brush" ? "#e8c27a" : "#8cdcff");
-    cx.translate(pt.x + 16, pt.y - 44); cx.rotate(pt.down ? -.5 : -.2); cx.drawImage(ti, -22, -22, 50, 50);
-    cx.restore();
-  }
+  drawCursor(G_.ptr, G_.tool, G_.net ? G_.net.names[G_.net.role==="host"?0:1] : "", "#ffffff");
+  if (G_.net) drawCursor(G_.remote, G_.remote.tool, G_.net.names[G_.net.role==="host"?1:0], "#ffd66b");
+}
+function drawCursor(pt, tool, label, color){
+  if (!pt?.in || G_.over || !tool) return;
+  const r = tool==="trowel" ? TROWEL.r : tool==="brush" ? BRUSH.r : 26;
+  cx.save(); cx.strokeStyle = tool==="scan" ? "rgba(140,220,255,.9)" : color; cx.lineWidth = 2; cx.setLineDash(tool==="brush"?[4,4]:[]);
+  cx.beginPath(); cx.arc(pt.x, pt.y, r, 0, 6.28); cx.stroke(); cx.setLineDash([]);
+  if (label){ cx.fillStyle = color; cx.font = "700 16px Readex Pro, sans-serif"; cx.textAlign = "center"; cx.fillText(label, pt.x, pt.y - r - 10); }
+  const ti = glyphImg(tool, tool==="trowel" ? "#c9ccd4" : tool==="brush" ? "#e8c27a" : "#8cdcff");
+  cx.translate(pt.x + 16, pt.y - 44); cx.rotate(pt.down ? -.5 : -.2); cx.drawImage(ti, -22, -22, 50, 50);
+  cx.restore();
 }
 
 /* ---------- Input ---------- */
@@ -776,17 +832,19 @@ function bindCanvas(){
     if (!G_ || G_.over || G_.paused || modal) return;
     cv.setPointerCapture(e.pointerId);
     const p = toWorld(e); Object.assign(pt(), p, {down:true, in:true});
+    if (G_.net?.role === "guest"){ netIn(G_.tool === "scan"); return; }
     if (G_.tool === "trowel"){ scoop(p.x,p.y); pt().lastScoop = p; }
     else if (G_.tool === "scan") scanAt(p.x,p.y);
   });
   cv.addEventListener("pointermove", e => {
     if (!G_) return;
     const p = toWorld(e); Object.assign(pt(), p, {in:true});
+    if (G_.net?.role === "guest"){ netIn(false); return; }
     if (pt().down && G_.tool === "trowel" && !G_.over && !G_.paused && !modal){
       const l = pt().lastScoop; if (l && Math.hypot(p.x-l.x, p.y-l.y) > 34){ scoop(p.x,p.y); pt().lastScoop = p; }
     }
   });
-  const up = () => { if (G_){ pt().down = false; pt().lastScoop = null; if (G_.tool==="brush") checkItems(); } };
+  const up = () => { if (G_){ pt().down = false; pt().lastScoop = null; if (G_.net?.role === "guest"){ netIn(false); return; } if (G_.tool==="brush") checkItems(); } };
   cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
   cv.addEventListener("pointerleave", () => { if (G_){ pt().in = false; up(); } });
 }
@@ -810,6 +868,7 @@ function endLevel(reason){
   won ? sfx.win() : sfx.lose();
   modal = {type:"result", won, reason, stars, pieceScore, timeBonus, lifeBonus, score, best:P.done[key]?.score||0, newPieces,
     unlockSite: firstClear && G_.cfg.l===2 && G_.cfg.s<4 ? SITES[G_.cfg.s+1] : null};
+  if (G_.net?.role === "host") wsSend({t:"over", won, reason, stars, pieceScore, timeBonus, lifeBonus, score, newPieces, found: G_.found.map(f => ({id:f.piece.id, hp:f.hp, who:f.who}))});
   setTimeout(renderModal, 500);
 }
 
@@ -819,7 +878,7 @@ function renderDigShell(cfg){
   app.innerHTML = `<div class="game">
     <div class="hud">
       <button class="round" id="pause" aria-label="Pause">${glyph("pause","#fff")}</button>
-      <div class="timer" id="timer"><span class="sunico"></span><div style="flex:1;min-width:0"><div class="eyebrow" style="font-size:10px">${cfg.site.name} · ${DIG_NAMES[cfg.l]}</div><div class="track"><i id="sunbar"></i></div></div><b id="tleft">${cfg.time}s</b></div>
+      <div class="timer" id="timer"><span class="sunico"></span><div style="flex:1;min-width:0"><div class="eyebrow" id="hud-eye" style="font-size:10px">${cfg.site.name} · ${DIG_NAMES[cfg.l]}</div><div class="track"><i id="sunbar"></i></div></div><b id="tleft">${cfg.time}s</b></div>
       <div class="hearts" id="hearts" aria-label="Lives"></div>
     </div>
     <div class="stage">
@@ -837,10 +896,18 @@ function renderDigShell(cfg){
   soilC = document.createElement("canvas"); soilC.width = GW; soilC.height = GH; soilX = soilC.getContext("2d"); soilImg = soilX.createImageData(GW, GH);
   cx.fillStyle = "#3a2618"; cx.fillRect(0,0,WW,WH); cx.fillStyle = "#f2e2c4"; cx.font = "600 22px Readex Pro, sans-serif"; cx.textAlign = "center"; cx.fillText("Preparing the trench…", WW/2, WH/2);
   bindCanvas();
-  document.getElementById("pause").onclick = () => { if (!G_ || G_.over) return; G_.paused = true; modal = {type:"pause"}; renderModal(); };
+  document.getElementById("pause").onclick = () => {
+    if (!G_ || G_.over) return;
+    if (G_.net?.role === "guest") { wsSend({t:"pause"}); return; }
+    pauseShared();
+  };
 }
 function toast(text, kind=""){
-  const t = document.getElementById("toast"); if (!t) return;
+  showToast(text, kind);
+  if (G_?.net?.role === "host") wsSend({t:"toast", text, kind});
+}
+function showToast(text, kind=""){
+  const t = document.getElementById("toast"); if (!t || !G_) return;
   t.textContent = text; t.className = "toast " + kind; G_.msgT = 4.5;
 }
 function paintTimer(){
@@ -848,6 +915,9 @@ function paintTimer(){
   bar.style.transform = `scaleX(${Math.max(0, Math.min(1, G_.time/G_.cfg.time))})`;
   document.getElementById("timer").classList.toggle("low", G_.time <= 15);
   document.getElementById("tleft").textContent = `${Math.ceil(G_.time)}s`;
+  const eye = document.getElementById("hud-eye");
+  if (eye && G_.duo) eye.textContent = `${G_.duo.names[G_.duo.turn]}'s turn · ${Math.ceil(Math.max(0, G_.duo.left))}s`;
+  else if (eye && G_.net) eye.textContent = `${G_.net.names[0]} + ${G_.net.names[1]}`;
 }
 function paintHud(){
   document.getElementById("hearts").innerHTML = [0,1,2].map(k => glyph("heart", k < G_.hearts ? "#ff5d6c" : "rgba(255,255,255,.18)")).join("");
@@ -863,12 +933,23 @@ function paintTools(){
   const t = (id,label,key,extra="") => `<button class="tool ${G_.tool===id?"on":""}" data-tool="${id}" aria-pressed="${G_.tool===id}" ${id==="scan"&&G_.scans<=0?"disabled":""}><kbd>${key}</kbd>${extra}<span class="face">${glyph(id, id==="trowel"?"#d6d9e0":id==="brush"?"#f0c77a":"#8cdcff")}</span>${label}</button>`;
   h.innerHTML = t("scan","Scan","1",`<span class="count">${G_.scans}</span>`) + t("trowel","Trowel · fast","2") + t("brush","Brush · safe","3")
     + (G_.found.length >= need(G_.cfg) && !G_.over ? `<button class="gbtn sm finishbtn" id="finish">Finish dig ${glyph("play","#2a1405").replace("<svg","<svg width='16' height='16'")}</button>` : "");
-  h.querySelectorAll(".tool").forEach(b => b.onclick = () => { G_.tool = b.dataset.tool; sfx.tap(); paintTools(); });
-  const f = document.getElementById("finish"); if (f) f.onclick = () => endLevel("finish");
+  h.querySelectorAll(".tool").forEach(b => b.onclick = () => { G_.tool = b.dataset.tool; sfx.tap(); paintTools(); if (G_.net?.role === "guest") netIn(false); });
+  const f = document.getElementById("finish"); if (f) f.onclick = () => { if (G_.net?.role === "guest") wsSend({t:"finish"}); else endLevel("finish"); };
 }
 function paintBag(){
   const b = document.getElementById("bag"); if (!b) return;
-  b.innerHTML = G_.found.length ? G_.found.map(f => `<span class="slot r-${f.piece.r}" title="${f.piece.name} · ${f.hp}%"><span>${glyph(f.piece.g, pieceColor(f.piece))}</span></span>`).join("") : `<span class="empty">Bag is empty</span>`;
+  const slot = f => `<span class="slot r-${f.piece.r}" title="${f.piece.name} · ${f.hp}%"><span>${glyph(f.piece.g, pieceColor(f.piece))}</span></span>`;
+  const names = pairNames();
+  if (names && G_.found.some(f => f.who != null)){
+    b.classList.add("duo");
+    b.innerHTML = names.map((n,i) => {
+      const mine = G_.found.filter(f => f.who === i);
+      return `<div class="bagrow"><b>${n}</b>${mine.length ? mine.map(slot).join("") : `<span class="empty">none yet</span>`}</div>`;
+    }).join("");
+    return;
+  }
+  b.classList.remove("duo");
+  b.innerHTML = G_.found.length ? G_.found.map(slot).join("") : `<span class="empty">Bag is empty</span>`;
 }
 function showFind(piece, hp){
   const fp = document.getElementById("findpop"); if (!fp) return;
@@ -932,7 +1013,11 @@ function renderHome(){
     </div>
     <div class="panel nextcard">
       <div><div class="eyebrow">Next dig · ${c.site.area}</div><h2>${c.site.name} · ${DIG_NAMES[c.l]}</h2><div class="row" style="display:flex;gap:10px;align-items:center;margin-top:4px">${starRow(d?.stars||0)}<span class="muted">${c.time}s · find ${need(c)} of ${c.pieces}</span></div></div>
-      <button class="gbtn big" id="home-play">${glyph("play","#2a1405").replace("<svg","<svg width='26' height='26'")}Play</button>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch">
+        <button class="gbtn big" id="home-play">${glyph("play","#2a1405").replace("<svg","<svg width='26' height='26'")}Play</button>
+        <button class="gbtn blue" id="home-duo">Pass and play</button>
+        <button class="gbtn" id="home-live">Same time</button>
+      </div>
     </div>
     <div class="progress">
       <div class="prog"><span class="eyebrow">Sites</span><b>${sitesOpen()}/5</b><div class="bar"><i style="width:${sitesOpen()/5*100}%"></i></div></div>
@@ -940,6 +1025,8 @@ function renderHome(){
       <div class="prog"><span class="eyebrow">Stars</span><b>${totalStars()}/45</b><div class="bar"><i style="width:${totalStars()/45*100}%"></i></div></div>
     </div>`);
   document.getElementById("home-play").onclick = () => { sfx.tap(); openLevel(n); };
+  document.getElementById("home-duo").onclick = () => { sfx.tap(); modal = {type:"duo", i:n}; renderModal(); };
+  document.getElementById("home-live").onclick = () => { sfx.tap(); modal = {type:"live", i:n, phase:"pick"}; renderModal(); };
 }
 function mapSvg(){
   const won = levelsWon(), open = SITES.map((s,i)=> won >= i*3);
@@ -1045,7 +1132,43 @@ function renderModal(){
         ${c.storm?`<span class="chip" style="color:#ffd08a">Sandstorm</span>`:""}
       </div>
       ${d ? `<p class="muted" style="text-align:center;margin:0">Best score: ${d.score.toLocaleString()}</p>` : ""}
-      <div class="btnrow"><button class="gbtn big" id="m-play">${glyph("play","#2a1405").replace("<svg","<svg width='26' height='26'")}Play</button></div>
+      <div class="btnrow"><button class="gbtn big" id="m-play">${glyph("play","#2a1405").replace("<svg","<svg width='26' height='26'")}Play</button><button class="gbtn blue" id="m-duo">Pass and play</button><button class="gbtn" id="m-live">Same time</button></div>
+    </div></div>`;
+  } else if (m.type === "duo"){
+    const c = levelCfg(m.i);
+    o.innerHTML = `<div class="modal" role="dialog" aria-label="Two players"><div class="in">
+      <button class="round close" id="m-close" aria-label="Close">${glyph("x","#fff")}</button>
+      <div class="ribbon"><div class="eyebrow" style="color:#d8d0f5">${c.site.name} · ${DIG_NAMES[c.l]}</div><h2>One tablet, two diggers</h2></div>
+      <p class="muted" style="margin:0">You share the trench, the sun, and the lives. Every 15 seconds the tablet passes. The sun waits during the pass. A find is logged under whoever uncovers it.</p>
+      <label for="p1" class="eyebrow">First digger</label>
+      <input type="text" id="p1" maxlength="16">
+      <label for="p2" class="eyebrow">Second digger</label>
+      <input type="text" id="p2" maxlength="16">
+      <div class="btnrow"><button class="gbtn big" id="m-duo-start">${glyph("play","#2a1405").replace("<svg","<svg width='26' height='26'")}Start together</button></div>
+    </div></div>`;
+  } else if (m.type === "live"){
+    const link = location.protocol === "file:" ? "" : location.origin;
+    o.innerHTML = `<div class="modal" role="dialog" aria-label="Same time"><div class="in">
+      <button class="round close" id="m-close" aria-label="Close">${glyph("x","#fff")}</button>
+      <div class="ribbon"><div class="eyebrow" style="color:#d8d0f5">Two devices, one trench</div><h2>${m.phase==="wait"?"Room "+m.code:m.phase==="join"?"Join a room":"Play at the same time"}</h2></div>
+      ${location.protocol==="file:" ? `<p class="muted" style="margin:0">Open the address the server printed, on both devices. A file opened from the folder cannot share a trench.</p>` : ""}
+      ${m.phase==="pick" ? `<p class="muted" style="margin:0">One person creates the room. The other joins with the code. Both cursors dig together. The sun and the lives are shared.</p>
+        ${link?`<p class="muted" style="margin:0">Same address on both devices: ${link}</p>`:""}
+        <div class="btnrow"><button class="gbtn" id="m-create">Create room</button><button class="gbtn blue" id="m-join">Join with a code</button></div>` : ""}
+      ${m.phase==="join" ? `<label for="rcode" class="eyebrow">Room code</label><input type="text" id="rcode" maxlength="4" autocapitalize="characters">
+        <div class="btnrow"><button class="gbtn" id="m-join-go">Join</button></div>` : ""}
+      ${m.phase==="wait" && m.role==="host" ? `<p class="code" style="font-family:var(--f-display);font-size:56px;letter-spacing:.18em;text-align:center;margin:0">${m.code}</p>
+        <p class="muted" style="text-align:center;margin:0">${m.names? m.names[1]+" is in. Start when you are both looking at the trench." : "Waiting for the other digger."}</p>
+        ${m.names?`<div class="btnrow"><button class="gbtn big" id="m-host-start">Start dig</button></div>`:""}` : ""}
+      ${m.phase==="wait" && m.role==="guest" ? `<p class="muted" style="text-align:center;margin:0">You are in room ${m.code}. Wait for ${m.names?m.names[0]:"the host"} to start the dig.</p>` : ""}
+      ${m.err?`<p class="muted" style="text-align:center;margin:0;color:var(--danger)">${m.err}</p>`:""}
+    </div></div>`;
+  } else if (m.type === "pass"){
+    const nxt = G_.duo.names[1 - G_.duo.turn];
+    o.innerHTML = `<div class="modal" role="dialog" aria-label="Pass the tablet"><div class="in">
+      <div class="ribbon"><div class="eyebrow" style="color:#d8d0f5">The sun is waiting</div><h2>Pass the tablet to ${nxt}</h2></div>
+      <p class="muted" style="text-align:center;margin:0">Same trench. Their finds stay in their row of the bag. Tap only when ${nxt} is holding it.</p>
+      <div class="btnrow"><button class="gbtn big" id="m-ready">${nxt} is ready</button></div>
     </div></div>`;
   } else if (m.type === "pause"){
     o.innerHTML = `<div class="modal" role="dialog" aria-label="Paused"><div class="in">
@@ -1081,7 +1204,8 @@ function renderModal(){
     const c = G_.cfg, why = {sunset:"The sun set before you found enough pieces.", hearts:"You ran out of lives. Brush over red rings next time.", all:"You found every piece in this trench!", finish:"Dig closed and logged."}[m.reason];
     o.innerHTML = `<div class="modal" role="dialog" aria-label="Dig result"><div class="in">
       <div class="ribbon ${m.won?"win":"lose"}"><div class="eyebrow" style="color:#fff">${c.site.name} · ${DIG_NAMES[c.l]}</div><h2>${m.won?"Find logged!":"Dig failed"}</h2>${bigStars(m.stars)}<p style="margin:6px 0 0;font-size:13px">${why}</p></div>
-      ${G_.found.length ? `<div class="cards">${G_.found.map((f,i)=>`<div class="card flip r-${f.piece.r}" style="animation-delay:${.3+i*.15}s"><div class="in">${glyph(f.piece.g, pieceColor(f.piece))}<span class="rar">${RAR[f.piece.r].label}${m.newPieces.includes(f.piece.id) && G_.found.findIndex(x=>x.piece.id===f.piece.id)===i?" · New":""}</span><b>${f.piece.name}</b><span class="muted">${f.hp}% intact</span></div></div>`).join("")}</div>` : ""}
+      ${pairNames() && G_.found.some(f=>f.who!=null) ? `<p class="muted" style="text-align:center;margin:0">${pairNames()[0]} logged ${G_.found.filter(f=>f.who===0).length}. ${pairNames()[1]} logged ${G_.found.filter(f=>f.who===1).length}. One trench, two names.</p>` : ""}
+      ${G_.found.length ? `<div class="cards">${G_.found.map((f,i)=>`<div class="card flip r-${f.piece.r}" style="animation-delay:${.3+i*.15}s"><div class="in">${glyph(f.piece.g, pieceColor(f.piece))}<span class="rar">${RAR[f.piece.r].label}${m.newPieces.includes(f.piece.id) && G_.found.findIndex(x=>x.piece.id===f.piece.id)===i?" · New":""}</span><b>${f.piece.name}</b><span class="muted">${f.hp}% intact${pairNames()&&f.who!=null?` · ${pairNames()[f.who]}`:""}</span></div></div>`).join("")}</div>` : ""}
       ${m.won ? `<div><div class="score"><span>Pieces (value × intact)</span><span>${m.pieceScore}</span></div><div class="score"><span>Daylight left</span><span>${m.timeBonus}</span></div><div class="score"><span>Lives left</span><span>${m.lifeBonus}</span></div><div class="score total"><span>Score</span><span>${m.score.toLocaleString()}</span></div></div>` : `<p class="muted" style="text-align:center;margin:0">Pieces you found still go to your museum.</p>`}
       ${m.unlockSite ? `<div class="chip done" style="justify-self:center;margin:0 auto">New site unlocked: ${m.unlockSite.name}</div>` : ""}
       <div class="btnrow">
@@ -1094,10 +1218,45 @@ function renderModal(){
   const q = id => o.querySelector("#"+id), on = (id,fn) => { const b = q(id); if (b) b.onclick = () => { sfx.tap(); fn(); }; };
   on("m-close", () => { modal = null; renderModal(); });
   on("m-play", () => startLevel(m.i));
-  on("m-resume", () => { modal = null; G_.paused = false; G_.last = performance.now(); renderModal(); });
-  on("m-restart", () => startLevel(G_.cfg.i));
-  on("m-retry", () => startLevel(G_.cfg.i));
-  on("m-next", () => startLevel(G_.cfg.i + 1));
+  on("m-duo", () => { modal = {type:"duo", i:m.i}; renderModal(); });
+  on("m-live", () => { modal = {type:"live", i:m.i, phase:"pick"}; renderModal(); });
+  on("m-create", () => liveCreate(m.i));
+  on("m-join", () => { modal = {type:"live", i:m.i, phase:"join"}; renderModal(); });
+  on("m-join-go", () => liveJoin(m.i, q("rcode")?.value || ""));
+  on("m-host-start", () => hostBegin(m.i, m.names));
+  on("m-duo-start", () => {
+    const a = (q("p1").value.trim() || "Player 1").slice(0,16);
+    const b = (q("p2").value.trim() || "Player 2").slice(0,16);
+    P.nick = a; P.p2 = b; save();
+    pendingDuo = [a,b];
+    startLevel(m.i);
+  });
+  on("m-ready", () => {
+    if (!G_?.duo) return;
+    G_.duo.turn = 1 - G_.duo.turn;
+    G_.duo.left = G_.duo.turnLen;
+    G_.paused = false;
+    G_.last = performance.now();
+    modal = null;
+    renderModal();
+    paintTimer();
+    toast(`${G_.duo.names[G_.duo.turn]}'s turn. Scan, scoop, or brush.`);
+  });
+  const again = (i) => {
+    if (G_?.net?.role === "guest") { showToast("The host restarts the dig."); return; }
+    if (G_?.net?.role === "host") { hostBegin(i, G_.net.names); return; }
+    pendingDuo = G_.duo ? G_.duo.names.slice() : null;
+    startLevel(i);
+  };
+  on("m-resume", () => {
+    if (G_?.net?.role === "guest") { wsSend({t:"resume"}); return; }
+    modal = null; if (G_){ G_.paused = false; G_.last = performance.now(); }
+    renderModal();
+    if (G_?.net?.role === "host") wsSend({t:"resume"});
+  });
+  on("m-restart", () => again(G_.cfg.i));
+  on("m-retry", () => again(G_.cfg.i));
+  on("m-next", () => again(G_.cfg.i + 1));
   on("m-quit", () => leaveDig(G_.cfg.s));
   on("m-map", () => leaveDig(m.unlockSite ? G_.cfg.s+1 : G_.cfg.s));
   on("m-sound", () => { P.muted = !P.muted; save(); renderModal(); });
@@ -1105,6 +1264,8 @@ function renderModal(){
   on("m-mute", () => { P.muted = !P.muted; save(); renderModal(); });
   on("m-howto", () => { modal = {type:"tutorial"}; renderModal(); });
   on("m-reset", () => { if (!m.confirmReset){ m.confirmReset = true; renderModal(); return; } const nick = P.nick; P = blank(); P.nick = nick; save(); modal = null; render(); });
+  if (q("p1")) q("p1").value = P.nick || "Player 1";
+  if (q("p2")) q("p2").value = P.p2 || "Player 2";
   if (q("nick")){ q("nick").value = P.nick; on("m-savenick", () => { const v = q("nick").value.trim().slice(0,20); if (v){ P.nick = v; save(); lastPushed = -1; pushScore(); modal = null; render(); } }); }
   o.addEventListener("click", e => { if (e.target === o && (m.type==="level"||m.type==="settings")){ modal = null; renderModal(); } });
   (q("m-play")||q("m-resume")||q("m-next")||q("m-tut")||o.querySelector(".gbtn"))?.focus();
@@ -1115,13 +1276,174 @@ document.addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT") return;
   if (e.key === "Escape" && modal && (modal.type==="level"||modal.type==="settings")){ modal = null; renderModal(); return; }
   if (view !== "dig" || !G_ || G_.over) return;
-  if (e.key === "Escape"){ if (modal?.type === "pause"){ modal = null; G_.paused = false; G_.last = performance.now(); } else if (!modal){ G_.paused = true; modal = {type:"pause"}; } renderModal(); return; }
+  if (modal?.type === "pass") return;
+  if (e.key === "Escape"){
+    if (G_?.net?.role === "guest"){ wsSend({t: modal?.type === "pause" ? "resume" : "pause"}); return; }
+    if (modal?.type === "pause"){ modal = null; G_.paused = false; G_.last = performance.now(); if (G_.net) wsSend({t:"resume"}); renderModal(); }
+    else if (!modal) pauseShared();
+    return;
+  }
   if (modal) return;
   const k = {"1":"scan","2":"trowel","3":"brush"}[e.key];
-  if (k && !(k==="scan" && G_.scans<=0)){ G_.tool = k; paintTools(); }
+  if (k && !(k==="scan" && G_.scans<=0)){ G_.tool = k; paintTools(); if (G_.net?.role === "guest") netIn(false); }
 });
-document.addEventListener("visibilitychange", () => { if (document.hidden && G_ && !G_.over && !modal){ G_.paused = true; modal = {type:"pause"}; renderModal(); } });
+document.addEventListener("visibilitychange", () => { if (document.hidden && G_ && !G_.over && !modal && G_.net?.role !== "guest") pauseShared(); });
 
+/* ---------- Same-time play ---------- */
+let sock = null, sockReady = null, lastIn = 0, lastSnap = 0;
+function pauseShared(){
+  if (!G_ || G_.over || modal) return;
+  G_.paused = true; modal = {type:"pause"}; renderModal();
+  if (G_.net?.role === "host") wsSend({t:"paused"});
+}
+function wsSend(obj){ if (sock && sock.readyState === 1) sock.send(JSON.stringify(obj)); }
+function openSocket(){
+  if (sock && sock.readyState === 1) return Promise.resolve(sock);
+  if (location.protocol === "file:") return Promise.reject(new Error("file"));
+  return new Promise((resolve, reject) => {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const s = new WebSocket(proto + "://" + location.host);
+    s.binaryType = "arraybuffer";
+    const timer = setTimeout(() => reject(new Error("timeout")), 5000);
+    s.onopen = () => { clearTimeout(timer); sock = s; s.onmessage = onSock; s.onclose = onSockClose; resolve(s); };
+    s.onerror = () => { clearTimeout(timer); reject(new Error("ws")); };
+  });
+}
+function onSockClose(){
+  sock = null;
+  if (G_ && !G_.over) showToast("The other digger disconnected.", "bad");
+}
+function onSock(ev){
+  if (ev.data instanceof ArrayBuffer){
+    const b = new Uint8Array(ev.data);
+    if (b[0] === 1 && G_?.net?.role === "guest" && G_.lv){
+      const T = G_.lv.T, n = Math.min(T.length, b.length - 1);
+      for (let i=0;i<n;i++) T[i] = b[i+1] / 255 * 1.6;
+      G_.dirty = true;
+    }
+    return;
+  }
+  let msg; try { msg = JSON.parse(ev.data); } catch { return; }
+  if (msg.t === "room"){
+    modal = {type:"live", i:modal?.i||0, phase:"wait", role:msg.role, code:msg.code, names:msg.names||null, err:""};
+    renderModal();
+  } else if (msg.t === "peer"){
+    if (modal?.type === "live"){ modal.names = msg.names; modal.err = ""; renderModal(); }
+  } else if (msg.t === "err"){
+    if (modal?.type === "live"){ modal.err = msg.text; renderModal(); }
+  } else if (msg.t === "begin"){
+    startLevel(msg.i, {seed: msg.seed, net:{role:"guest", names: msg.names}});
+  } else if (msg.t === "in" && G_?.net?.role === "host"){
+    onRemoteIn(msg);
+  } else if (msg.t === "snap" && G_?.net?.role === "guest"){
+    applySnap(msg);
+  } else if (msg.t === "toast" && G_?.net?.role === "guest"){
+    showToast(msg.text, msg.kind||"");
+  } else if (msg.t === "over" && G_?.net?.role === "guest"){
+    guestOver(msg);
+  } else if (msg.t === "finish" && G_?.net?.role === "host"){
+    endLevel("finish");
+  } else if (msg.t === "pause" && G_?.net?.role === "host"){
+    pauseShared();
+  } else if (msg.t === "paused" && G_?.net?.role === "guest" && G_ && !G_.over){
+    G_.paused = true; modal = {type:"pause"}; renderModal();
+  } else if (msg.t === "resume" && G_?.net?.role === "host"){
+    modal = null; G_.paused = false; G_.last = performance.now(); renderModal(); wsSend({t:"resume"});
+  } else if (msg.t === "resume" && G_?.net?.role === "guest" && G_){
+    modal = null; G_.paused = false; G_.last = performance.now(); renderModal();
+  } else if (msg.t === "bye"){
+    showToast("The other digger left.", "bad");
+  }
+}
+function onRemoteIn(msg){
+  if (!G_) return;
+  const prevDown = G_.remote.down, prevTool = G_.remote.tool;
+  G_.remote.x = msg.x; G_.remote.y = msg.y; G_.remote.down = !!msg.down; G_.remote.in = !!msg.inn; G_.remote.tool = msg.tool || "trowel";
+  if (G_.over || G_.paused || modal) return;
+  if (G_.remote.tool === "trowel" && G_.remote.down){
+    const l = G_.remote.lastScoop;
+    if (!l || Math.hypot(G_.remote.x-l.x, G_.remote.y-l.y) > 34){ scoop(G_.remote.x, G_.remote.y); G_.remote.lastScoop = {x:G_.remote.x, y:G_.remote.y}; }
+  } else G_.remote.lastScoop = null;
+  if (msg.scan && !(prevDown && prevTool === "scan")) scanAt(G_.remote.x, G_.remote.y);
+}
+function netIn(scanEdge){
+  if (G_?.net?.role !== "guest") return;
+  const now = performance.now();
+  if (!scanEdge && G_.ptr.down && now - lastIn < 40) return;
+  lastIn = now;
+  const p = G_.ptr;
+  wsSend({t:"in", x:+p.x.toFixed(1), y:+p.y.toFixed(1), down:!!p.down, inn:!!p.in, tool:G_.tool, scan:!!scanEdge});
+}
+function netBroadcast(){
+  const now = performance.now();
+  if (now - lastSnap < 160 || !G_) return;
+  lastSnap = now;
+  const lv = G_.lv;
+  wsSend({t:"snap", time:G_.time, hearts:G_.hearts, scans:G_.scans,
+    found: G_.found.map(f => ({id:f.piece.id, hp:f.hp, who:f.who})),
+    items: lv.items.map(it => ({got:!!it.got, gone:!!it.gone, hp:it.hp|0, scanned:!!it.scanned, cracks:(it.cracks||[]).length, x:Math.round(it.x), y:Math.round(it.y), rot:+it.rot.toFixed(3)})),
+    me:{x:G_.ptr.x, y:G_.ptr.y, down:!!G_.ptr.down, inn:!!G_.ptr.in, tool:G_.tool}
+  });
+  const b = new Uint8Array(1 + lv.T.length);
+  b[0] = 1;
+  for (let i=0;i<lv.T.length;i++) b[i+1] = Math.max(0, Math.min(255, (lv.T[i] / 1.6) * 255));
+  if (sock && sock.readyState === 1) sock.send(b);
+}
+function applySnap(s){
+  if (!G_ || G_.net?.role !== "guest") return;
+  G_.time = s.time; G_.hearts = s.hearts; G_.scans = s.scans;
+  G_.remote = {x:s.me.x, y:s.me.y, down:!!s.me.down, in:!!s.me.inn, tool:s.me.tool||"trowel", lastScoop:G_.remote?.lastScoop||null};
+  const prev = G_.found.length;
+  G_.found = (s.found||[]).map(f => ({piece:PIECES.find(p=>p.id===f.id), hp:f.hp, who:f.who})).filter(f=>f.piece);
+  if (G_.found.length > prev){ const last = G_.found[G_.found.length-1]; showFind(last.piece, last.hp); sfx.find(last.piece.r); }
+  let moved = false;
+  (s.items||[]).forEach((st,i) => {
+    const it = G_.lv.items[i]; if (!it) return;
+    if (st.x !== it.x || st.y !== it.y || !!st.gone !== !!it.gone || !!st.got !== !!it.got) moved = true;
+    it.got = !!st.got; it.gone = !!st.gone; it.hp = st.hp; it.scanned = !!st.scanned; it.x = st.x; it.y = st.y; it.rot = st.rot;
+    it.cracks = it.cracks || [];
+    while (it.cracks.length < (st.cracks||0)) it.cracks.push({a:it.cracks.length, l:.4});
+  });
+  if (moved) rebuildMasks(G_.lv);
+  G_.dirty = true;
+  paintHud(); paintBag(); paintTools();
+}
+function guestOver(msg){
+  if (!G_ || G_.over) return;
+  G_.over = true;
+  G_.found = (msg.found||[]).map(f => ({piece:PIECES.find(p=>p.id===f.id), hp:f.hp, who:f.who})).filter(f=>f.piece);
+  G_.found.forEach(f => { P.museum[f.piece.id] = (P.museum[f.piece.id]||0)+1; });
+  const key = lvKey(G_.cfg.i), prev = P.done[key];
+  if (msg.won && (!prev || msg.score > prev.score || msg.stars > prev.stars)) P.done[key] = {score:Math.max(msg.score, prev?.score||0), stars:Math.max(msg.stars, prev?.stars||0)};
+  save();
+  msg.won ? sfx.win() : sfx.lose();
+  modal = {type:"result", won:msg.won, reason:msg.reason, stars:msg.stars, pieceScore:msg.pieceScore, timeBonus:msg.timeBonus, lifeBonus:msg.lifeBonus, score:msg.score, best:P.done[key]?.score||0, newPieces:msg.newPieces||[], unlockSite:null};
+  renderModal();
+}
+async function liveCreate(i){
+  try {
+    await openSocket();
+    wsSend({t:"create", name:P.nick||"Player 1"});
+    if (modal) modal.i = i;
+  } catch {
+    if (modal){ modal.err = "The game server is not running on this address."; renderModal(); }
+  }
+}
+async function liveJoin(i, code){
+  try {
+    await openSocket();
+    wsSend({t:"join", code:String(code||"").toUpperCase(), name:P.nick||"Player 2"});
+    if (modal) modal.i = i;
+  } catch {
+    if (modal){ modal.err = "Could not reach the server. Use the same address as the host."; renderModal(); }
+  }
+}
+function hostBegin(i, names){
+  const seed = (Math.random()*0x7fffffff)|0;
+  const both = names && names[1] ? names : [P.nick||"Player 1", P.p2||"Player 2"];
+  wsSend({t:"begin", i, seed, names: both});
+  startLevel(i, {seed, net:{role:"host", names: both}});
+}
 function start(){ selSite = Math.min(4, Math.floor(unlockedUpTo()/3)); render(); connect(); }
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start();
 })();
